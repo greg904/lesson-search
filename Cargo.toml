@@ -1,0 +1,11 @@
+[package]
+name = "lesson-fts-mvp"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+mupdf = "0.3.0"
+libc = "0.2.117"
+urlencoding = "2.1.0"
+ravif = "0.8.8"
+rgb = "0.8.31"

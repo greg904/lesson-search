@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
+<p>What do you want to search for?</p>
+<input type="text" id="query" />
+<div id="results"></div>
+<script>
+const queryInput = document.getElementById('query')
+const results = document.getElementById('results')
+queryInput.addEventListener('input', function () {
+	const v = queryInput.value
+	fetch("http://localhost:3000/" + v)
+		.then(res => res.arrayBuffer())
+		.then(res => {
+			const binaries = []
+			let cursor = 0
+			while (cursor < res.byteLength) {
+				const length = new Uint32Array(res.slice(cursor), 0, 1)[0]
+				const start = cursor + 4
+				const end = start + length
+				binaries.push(res.slice(start, end))
+				cursor = end
+			}
+			results.innerHTML = ''
+			for (let binary of binaries) {
+				const blob = new Blob([binary], { type: 'image/avif' })
+				const image = document.createElement('img')
+				image.src = URL.createObjectURL(blob)
+				results.appendChild(image)
+			}
+		})
+})
+</script>
+</body>
+</html>
