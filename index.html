@@ -9,28 +9,59 @@
 <script>
 const queryInput = document.getElementById('query')
 const results = document.getElementById('results')
+const objectURLs = []
+let isLooping = false
+
+async function fetchAndUpdate (query) {
+	const res = await fetch('http://localhost:3000/' + encodeURIComponent(query))
+	const buf = await res.arrayBuffer()
+
+	// Decode into an image array.
+	const imagesBytes = []
+	let cursor = 0
+	while (cursor < buf.byteLength) {
+		const length = new Uint32Array(buf.slice(cursor), 0, 1)[0]
+		const start = cursor + 4
+		const end = start + length
+		imagesBytes.push(buf.slice(start, end))
+		cursor = end
+	}
+
+	// Remove all previous images.
+	results.innerHTML = ''
+	for (let url of objectURLs) {
+		URL.revokeObjectURL(url)
+	}
+	objectURLs.length = 0
+
+	// Create new images.
+	for (let imageBytes of imagesBytes) {
+		const blob = new Blob([imageBytes], { type: 'image/avif' })
+		const url = URL.createObjectURL(blob)
+		objectURLs.push(url)
+		const image = document.createElement('img')
+		image.src = url
+		results.appendChild(image)
+	}
+}
+
+async function loop() {
+	let lastQuery
+	let query = queryInput.value
+	do {
+		await fetchAndUpdate(query)
+		lastQuery = query
+		query = queryInput.value
+	} while (query !== lastQuery)
+}
+
 queryInput.addEventListener('input', function () {
-	const v = queryInput.value
-	fetch("http://localhost:3000/" + v)
-		.then(res => res.arrayBuffer())
-		.then(res => {
-			const binaries = []
-			let cursor = 0
-			while (cursor < res.byteLength) {
-				const length = new Uint32Array(res.slice(cursor), 0, 1)[0]
-				const start = cursor + 4
-				const end = start + length
-				binaries.push(res.slice(start, end))
-				cursor = end
-			}
-			results.innerHTML = ''
-			for (let binary of binaries) {
-				const blob = new Blob([binary], { type: 'image/avif' })
-				const image = document.createElement('img')
-				image.src = URL.createObjectURL(blob)
-				results.appendChild(image)
-			}
-		})
+	if (isLooping) {
+		return
+	}
+	isLooping = true
+	loop()
+		.then(() => isLooping = false)
 })
 </script>
 </body>
