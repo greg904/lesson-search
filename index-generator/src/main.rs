@@ -109,52 +109,14 @@ fn process_lesson_pdf<P: AsRef<Path>>(
     let content_start = first_useful_outline.map(|o| (o.page.unwrap(), o.y));
 
     for (page_index, page) in doc.pages().unwrap().enumerate() {
-        if let Some((start_page, _start_y)) = content_start {
-            if page_index < start_page as usize {
-                continue;
-            }
-        }
         let page = page.unwrap();
-        let text_page = page.to_text_page(TextPageOptions::empty()).unwrap();
-        for b in text_page.blocks() {
-            for l in b.lines() {
-                let bounds = l.bounds();
-                if let Some((start_page, start_y)) = content_start {
-                    if page_index == start_page as usize && bounds.y1 < start_y {
-                        continue;
-                    }
-                }
-                let line: String = l.chars().flat_map(|c| c.char()).collect();
-                let words: Vec<String> = deunicode::deunicode(&line)
-                    .to_ascii_lowercase()
-                    .split(|c: char| !c.is_ascii_alphanumeric())
-                    .filter(|w| w.len() > 2)
-                    .map(|w| w.to_owned())
-                    .collect();
-                if words.len() < 2 || (words[0] != "theoreme" && words[0] != "definition") {
-                    continue;
-                }
-                let result_index = index.results.len();
-                index.results.push(SearchResult {
-                    image_index: index.image_ids.len() as u32,
-                    x: bounds.x0 as i16,
-                    y: bounds.y0 as i16,
-                    width: (bounds.x1 - bounds.x0) as u16,
-                    height: (bounds.y1 - bounds.y0) as u16,
-                });
-                for w in words.iter() {
-                    index.words.entry(w.to_string()).or_default().push(Match {
-                        result_index: result_index as u32,
-                        score: 1. / words.len() as f32,
-                    });
-                }
-            }
-        }
+
+        // Encode image for the page or reuse existing one.
         let image_id = if page_index >= image_cache_doc.len() {
             // TODO: fix the `alpha` parameter not being a boolean
             let pixmap = page
                 .to_pixmap(
-                    &Matrix::new_scale(3., 3.),
+                    &Matrix::new_scale(2., 2.),
                     &Colorspace::device_rgb(),
                     0.,
                     false,
@@ -179,6 +141,48 @@ fn process_lesson_pdf<P: AsRef<Path>>(
         } else {
             image_cache_doc[page_index].clone()
         };
+
+        // Scan the page for text.
+        if let Some((start_page, _start_y)) = content_start {
+            if page_index < start_page as usize {
+                continue;
+            }
+        }
+        let text_page = page.to_text_page(TextPageOptions::empty()).unwrap();
+        for b in text_page.blocks() {
+            for l in b.lines() {
+                let bounds = l.bounds();
+                if let Some((start_page, start_y)) = content_start {
+                    if page_index == start_page as usize && bounds.y1 < start_y {
+                        continue;
+                    }
+                }
+                let line: String = l.chars().flat_map(|c| c.char()).collect();
+                let words: Vec<String> = deunicode::deunicode(&line)
+                    .to_ascii_lowercase()
+                    .split(|c: char| !c.is_ascii_alphanumeric())
+                    .filter(|w| w.len() > 2)
+                    .map(|w| w.to_owned())
+                    .collect();
+                if words.len() < 2 || (words[0] != "theoreme" && words[0] != "definition") {
+                    continue;
+                }
+                let result_index = index.results.len();
+                index.results.push(SearchResult {
+                    image_index: index.image_ids.len() as u32,
+                    x: (bounds.x0 * 2.) as i16,
+                    y: (bounds.y0 * 2.) as i16,
+                    width: ((bounds.x1 - bounds.x0) * 2.) as u16,
+                    height: ((bounds.y1 - bounds.y0) * 2.) as u16,
+                });
+                for w in words.iter() {
+                    index.words.entry(w.to_string()).or_default().push(Match {
+                        result_index: result_index as u32,
+                        score: 1. / words.len() as f32,
+                    });
+                }
+            }
+        }
         index.image_ids.push(image_id);
     }
 }
