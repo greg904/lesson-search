@@ -32,7 +32,7 @@ fn main() {
                 .map(|w| w.to_owned())
                 .collect();
             let mut results: Vec<QueryResponseItem> = Vec::new();
-            for w in words.iter() {
+            'search: for w in words.iter() {
                 if let Some(matches) = search_index.words.get(w) {
                     for m in matches {
                         let result = &search_index.results[m.result_index as usize];
@@ -44,6 +44,9 @@ fn main() {
                             width: result.width,
                             height: result.height,
                         });
+                        if results.len() > 5 {
+                            break 'search;
+                        }
                     }
                 }
             }
