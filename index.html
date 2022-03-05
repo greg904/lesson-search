@@ -9,38 +9,19 @@
 <script>
 const queryInput = document.getElementById('query')
 const results = document.getElementById('results')
-const objectURLs = []
 let isLooping = false
 
 async function fetchAndUpdate (query) {
 	const res = await fetch('http://localhost:3000/' + encodeURIComponent(query))
-	const buf = await res.arrayBuffer()
-
-	// Decode into an image array.
-	const imagesBytes = []
-	let cursor = 0
-	while (cursor < buf.byteLength) {
-		const length = new Uint32Array(buf.slice(cursor), 0, 1)[0]
-		const start = cursor + 4
-		const end = start + length
-		imagesBytes.push(buf.slice(start, end))
-		cursor = end
-	}
+	const matches = await res.json()
 
 	// Remove all previous images.
 	results.innerHTML = ''
-	for (let url of objectURLs) {
-		URL.revokeObjectURL(url)
-	}
-	objectURLs.length = 0
 
 	// Create new images.
-	for (let imageBytes of imagesBytes) {
-		const blob = new Blob([imageBytes], { type: 'image/avif' })
-		const url = URL.createObjectURL(blob)
-		objectURLs.push(url)
+	for (let match of matches) {
 		const image = document.createElement('img')
-		image.src = url
+		image.src = 'index/images/' + match.imageId + '.jpg'
 		results.appendChild(image)
 	}
 }

@@ -93,18 +93,18 @@ impl SearchIndex {
     }
 
     pub fn serialize<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        w.write_all(&self.image_ids.len().to_le_bytes())?;
+        w.write_all(&(self.image_ids.len() as u32).to_le_bytes())?;
         for id in self.image_ids.iter() {
             w.write_all(&(id.len() as u32).to_le_bytes())?;
             w.write_all(id.as_bytes())?;
         }
-        w.write_all(&self.results.len().to_le_bytes())?;
+        w.write_all(&(self.results.len() as u32).to_le_bytes())?;
         for r in self.results.iter() {
             w.write_all(&r.image_index.to_le_bytes())?;
             w.write_all(&r.x.to_le_bytes())?;
             w.write_all(&r.y.to_le_bytes())?;
         }
-        w.write_all(&self.words.len().to_le_bytes())?;
+        w.write_all(&(self.words.len() as u32).to_le_bytes())?;
         for (word, matches) in self.words.iter() {
             w.write_all(&(word.len() as u32).to_le_bytes())?;
             w.write_all(word.as_bytes())?;
