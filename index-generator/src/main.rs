@@ -5,7 +5,7 @@ use std::{
     path::Path,
 };
 
-use mupdf::{pdf::PdfDocument, Colorspace, Matrix, TextPageOptions};
+use mupdf::{pdf::PdfDocument, Colorspace, Matrix, TextPageOptions, Outline};
 use search_index::{Match, SearchIndex, SearchResult};
 
 type ImageId = String;
@@ -66,6 +66,16 @@ impl ImageCache {
     }
 }
 
+fn find_first_useful_outline(outlines: &[Outline]) -> Option<&Outline> {
+    let o = outlines.iter()
+        .filter(|o| !o.title.eq_ignore_ascii_case("table des matières"))
+        .next()?;
+    if o.down.is_empty() {
+        return Some(o);
+    }
+    find_first_useful_outline(&o.down)
+}
+
 fn process_lesson_pdf<P: AsRef<Path>>(
     path: P,
     index: &mut SearchIndex,
@@ -77,7 +87,7 @@ fn process_lesson_pdf<P: AsRef<Path>>(
     compressor.set_quality(50);
     compressor.set_subsamp(turbojpeg::Subsamp::Sub2x1);
 
-    let mut image_cache_doc = image_cache
+    let image_cache_doc = image_cache
         .by_path
         .entry(
             path.as_ref()
@@ -90,12 +100,30 @@ fn process_lesson_pdf<P: AsRef<Path>>(
         .or_default();
 
     let doc = PdfDocument::open(path.as_ref().to_str().unwrap()).unwrap();
+
+
+    // Ignore header and table of content by looking at the first outline that is not the table of
+    // content, if there is one.
+    let outlines = doc.outlines().unwrap();
+    let first_useful_outline = find_first_useful_outline(&outlines);
+    let content_start = first_useful_outline.map(|o| (o.page.unwrap(), o.y));
+
     for (page_index, page) in doc.pages().unwrap().enumerate() {
+        if let Some((start_page, _start_y)) = content_start {
+            if page_index < start_page as usize {
+                continue;
+            }
+        }
         let page = page.unwrap();
         let text_page = page.to_text_page(TextPageOptions::empty()).unwrap();
         for b in text_page.blocks() {
             for l in b.lines() {
                 let bounds = l.bounds();
+                if let Some((start_page, start_y)) = content_start {
+                    if page_index == start_page as usize && bounds.y1 < start_y {
+                        continue;
+                    }
+                }
                 let line: String = l.chars().flat_map(|c| c.char()).collect();
                 let words: Vec<String> = deunicode::deunicode(&line)
                     .to_ascii_lowercase()
