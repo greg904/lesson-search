@@ -1,28 +1,49 @@
 <!DOCTYPE html>
 <html>
 <head>
+<style>
+.match {
+	position: relative;
+}
+
+.highlight {
+	position: absolute;
+	background: yellow;
+	opacity: 0.2;
+}
+</style>
 </head>
 <body>
 <p>What do you want to search for?</p>
 <input type="text" id="query" />
-<div id="results"></div>
+<div id="matches"></div>
 <script>
 const queryInput = document.getElementById('query')
-const results = document.getElementById('results')
+const matchesDiv = document.getElementById('matches')
 let isLooping = false
 
 async function fetchAndUpdate (query) {
 	const res = await fetch('http://localhost:3000/' + encodeURIComponent(query))
 	const matches = await res.json()
 
-	// Remove all previous images.
-	results.innerHTML = ''
+	// Remove all previous results.
+	matchesDiv.innerHTML = ''
 
-	// Create new images.
+	// Create new elements.
 	for (let match of matches) {
 		const image = document.createElement('img')
 		image.src = 'index/images/' + match.imageId + '.jpg'
-		results.appendChild(image)
+		const highlight = document.createElement('div')
+		highlight.classList.add('highlight')
+		highlight.style.top = (match.y * 3) + 'px'
+		highlight.style.left = (match.x * 3) + 'px'
+		highlight.style.width = (match.width * 3) + 'px'
+		highlight.style.height = (match.height * 3) + 'px'
+		const matchDiv = document.createElement('div')
+		matchDiv.classList.add('match')
+		matchDiv.appendChild(image)
+		matchDiv.appendChild(highlight)
+		matchesDiv.appendChild(matchDiv)
 	}
 }
 

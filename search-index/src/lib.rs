@@ -5,8 +5,10 @@ use std::{
 
 pub struct SearchResult {
     pub image_index: u32,
-    pub x: f32,
-    pub y: f32,
+    pub x: i16,
+    pub y: i16,
+    pub width: u16,
+    pub height: u16,
 }
 
 pub struct Match {
@@ -51,11 +53,16 @@ impl SearchIndex {
         for _ in 0..results_len {
             r.read_exact(&mut buf)?;
             let image_index = u32::from_le_bytes(buf);
+            let mut buf = [0u8; 2];
             r.read_exact(&mut buf)?;
-            let x = f32::from_le_bytes(buf);
+            let x = i16::from_le_bytes(buf);
             r.read_exact(&mut buf)?;
-            let y = f32::from_le_bytes(buf);
-            results.push(SearchResult { image_index, x, y });
+            let y = i16::from_le_bytes(buf);
+            r.read_exact(&mut buf)?;
+            let width = u16::from_le_bytes(buf);
+            r.read_exact(&mut buf)?;
+            let height = u16::from_le_bytes(buf);
+            results.push(SearchResult { image_index, x, y, width, height });
         }
         r.read_exact(&mut buf)?;
         let words_len = u32::from_le_bytes(buf);
@@ -103,6 +110,8 @@ impl SearchIndex {
             w.write_all(&r.image_index.to_le_bytes())?;
             w.write_all(&r.x.to_le_bytes())?;
             w.write_all(&r.y.to_le_bytes())?;
+            w.write_all(&r.width.to_le_bytes())?;
+            w.write_all(&r.height.to_le_bytes())?;
         }
         w.write_all(&(self.words.len() as u32).to_le_bytes())?;
         for (word, matches) in self.words.iter() {

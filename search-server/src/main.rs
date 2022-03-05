@@ -11,8 +11,10 @@ mod http_server;
 #[serde(rename_all = "camelCase")]
 struct QueryResponseItem {
     image_id: String,
-    x: f32,
-    y: f32,
+    x: i16,
+    y: i16,
+    width: u16,
+    height: u16,
 }
 
 fn main() {
@@ -39,6 +41,8 @@ fn main() {
                             image_id: image_id.clone(),
                             x: result.x,
                             y: result.y,
+                            width: result.width,
+                            height: result.height,
                         });
                     }
                 }

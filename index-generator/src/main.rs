@@ -8,28 +8,10 @@ fn process_lesson_pdf<P: AsRef<Path>>(path: P, index: &mut SearchIndex) {
     let doc = PdfDocument::open(path.as_ref().to_str().unwrap()).unwrap();
     for page in doc.pages().unwrap() {
         let page = page.unwrap();
-        /*
-        let page_obj = doc.find_page(i as i32).unwrap()
-            .resolve().unwrap().unwrap();
-        let contents = page_obj.get_dict("Contents").unwrap().unwrap();
-        let process_stream = |stream_obj: PdfObject| {
-            let stream = stream_obj.read_stream().unwrap();
-            println!("{}", String::from_utf8_lossy(&stream));
-        };
-        if contents.is_array().unwrap() {
-            for j in 0..contents.len().unwrap() {
-                process_stream(contents.get_array(j as i32).unwrap().unwrap());
-            }
-        } else {
-            process_stream(contents);
-        }
-        */
         let text_page = page.to_text_page(TextPageOptions::empty()).unwrap();
         for b in text_page.blocks() {
             for l in b.lines() {
                 let bounds = l.bounds();
-                let x = (bounds.x0 + bounds.x1) / 2.;
-                let y = (bounds.y0 + bounds.y1) / 2.;
                 let line: String = l.chars()
                     .flat_map(|c| c.char())
                     .collect();
@@ -45,8 +27,10 @@ fn process_lesson_pdf<P: AsRef<Path>>(path: P, index: &mut SearchIndex) {
                 let result_index = index.results.len();
                 index.results.push(SearchResult {
                     image_index: index.image_ids.len() as u32,
-                    x,
-                    y,
+                    x: bounds.x0 as i16,
+                    y: bounds.y0 as i16,
+                    width: (bounds.x1 - bounds.x0) as u16,
+                    height: (bounds.y1 - bounds.y0) as u16,
                 });
                 for w in words.iter() {
                     index.words.entry(w.to_string())
