@@ -8,13 +8,18 @@ use search_index::SearchIndex;
 mod http_server;
 
 #[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct QueryResponseItem {
-    image_id: String,
+struct Rect {
     x: i16,
     y: i16,
     width: u16,
     height: u16,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PageMatch {
+    image_id: String,
+    rects: Vec<Rect>,
 }
 
 fn main() {
@@ -31,32 +36,39 @@ fn main() {
                 .filter(|w| w.len() > 2)
                 .map(|w| w.to_owned())
                 .collect();
-            let mut score_by_result_index: BTreeMap<u32, f32> = BTreeMap::new();
+            let mut scores: BTreeMap<u32, f32> = BTreeMap::new();
             for w in words.iter() {
                 if let Some(matches) = search_index.words.get(w) {
                     for m in matches {
-                        *score_by_result_index.entry(m.result_index).or_default() += m.score;
+                        *scores.entry(m.result_index).or_default() += m.score;
                     }
                 }
             }
-            let mut sorted: Vec<_> = score_by_result_index.into_iter().collect();
+            let mut sorted: Vec<_> = scores.into_iter().collect();
             sorted.sort_by(|(_, s_a), (_, s_b)| s_b.partial_cmp(s_a).unwrap());
-            let results: Vec<QueryResponseItem> = sorted
-                .iter()
-                .map(|(r, _)| {
-                    let result = &search_index.results[*r as usize];
-                    let image_id = &search_index.image_ids[result.image_index as usize];
-                    QueryResponseItem {
-                        image_id: image_id.clone(),
-                        x: result.x,
-                        y: result.y,
-                        width: result.width,
-                        height: result.height,
+            let mut pages: Vec<PageMatch> = Vec::new();
+            for (r, _) in sorted.iter() {
+                let result = &search_index.results[*r as usize];
+                let image_id = &search_index.image_ids[result.image_index as usize];
+                let page_index = match pages.iter().position(|p| &p.image_id == image_id) {
+                    Some(i) => i,
+                    None => {
+                        let i = pages.len();
+                        pages.push(PageMatch {
+                            image_id: image_id.clone(),
+                            rects: Vec::new(),
+                        });
+                        i
                     }
-                })
-                .take(5)
-                .collect();
-            let body = serde_json::to_string(&results).unwrap().into();
+                };
+                pages[page_index].rects.push(Rect {
+                    x: result.x,
+                    y: result.y,
+                    width: result.width,
+                    height: result.height,
+                });
+            }
+            let body = serde_json::to_string(&pages).unwrap().into();
             Response {
                 status_code: 200,
                 headers: Vec::new(),
