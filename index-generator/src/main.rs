@@ -5,7 +5,7 @@ use std::{
     path::Path,
 };
 
-use mupdf::{pdf::PdfDocument, Colorspace, Matrix, TextPageOptions, Outline};
+use mupdf::{pdf::PdfDocument, Colorspace, Matrix, Outline, TextPageOptions};
 use search_index::{Match, SearchIndex, SearchResult};
 
 type ImageId = String;
@@ -67,7 +67,8 @@ impl ImageCache {
 }
 
 fn find_first_useful_outline(outlines: &[Outline]) -> Option<&Outline> {
-    let o = outlines.iter()
+    let o = outlines
+        .iter()
         .filter(|o| !o.title.eq_ignore_ascii_case("table des matières"))
         .next()?;
     if o.down.is_empty() {
@@ -100,7 +101,6 @@ fn process_lesson_pdf<P: AsRef<Path>>(
         .or_default();
 
     let doc = PdfDocument::open(path.as_ref().to_str().unwrap()).unwrap();
-
 
     // Ignore header and table of content by looking at the first outline that is not the table of
     // content, if there is one.

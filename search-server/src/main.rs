@@ -1,4 +1,4 @@
-use std::{fs::File, collections::HashMap};
+use std::{collections::BTreeMap, fs::File};
 
 use serde::Serialize;
 
@@ -31,21 +31,20 @@ fn main() {
                 .filter(|w| w.len() > 2)
                 .map(|w| w.to_owned())
                 .collect();
-            let mut score_by_result_index: HashMap<u32, f32> = HashMap::new();
+            let mut score_by_result_index: BTreeMap<u32, f32> = BTreeMap::new();
             for w in words.iter() {
                 if let Some(matches) = search_index.words.get(w) {
                     for m in matches {
-                        *score_by_result_index
-                            .entry(m.result_index)
-                            .or_default() += m.score;
+                        *score_by_result_index.entry(m.result_index).or_default() += m.score;
                     }
                 }
             }
             let mut sorted: Vec<_> = score_by_result_index.into_iter().collect();
-            sorted.sort_unstable_by(|(_, s_a), (_, s_b)| s_b.partial_cmp(s_a).unwrap());
-            let results: Vec<QueryResponseItem> = sorted.iter()
+            sorted.sort_by(|(_, s_a), (_, s_b)| s_b.partial_cmp(s_a).unwrap());
+            let results: Vec<QueryResponseItem> = sorted
+                .iter()
                 .map(|(r, _)| {
-                   let result = &search_index.results[*r as usize];
+                    let result = &search_index.results[*r as usize];
                     let image_id = &search_index.image_ids[result.image_index as usize];
                     QueryResponseItem {
                         image_id: image_id.clone(),
