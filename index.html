@@ -57,6 +57,13 @@ async function loop() {
 	} while (query !== lastQuery)
 }
 
+// This can happen if the user inputs a query and reloads the page.
+if (queryInput.value !== '') {
+	isLooping = true
+	loop()
+		.then(() => isLooping = false)
+}
+
 queryInput.addEventListener('input', function () {
 	if (isLooping) {
 		return
