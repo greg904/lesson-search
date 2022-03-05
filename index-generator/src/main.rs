@@ -103,7 +103,7 @@ fn process_lesson_pdf<P: AsRef<Path>>(
                     .filter(|w| w.len() > 2)
                     .map(|w| w.to_owned())
                     .collect();
-                if words.len() < 2 || words[0] != "theoreme" {
+                if words.len() < 2 || (words[0] != "theoreme" && words[0] != "definition") {
                     continue;
                 }
                 let result_index = index.results.len();
