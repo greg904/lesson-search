@@ -1,58 +1,8 @@
-use std::{fs::{self, OpenOptions}, path::Path, collections::HashMap, io::{Write, self}};
+use std::{fs::{self, OpenOptions}, path::Path};
 
 use image::{codecs::jpeg::JpegEncoder, ColorType};
-use mupdf::{pdf::{PdfDocument, PdfObject}, Colorspace, Matrix, TextPageOptions};
-
-struct SearchResult {
-    image_index: u32,
-    x: f32,
-    y: f32,
-}
-
-struct Match {
-    result_index: u32,
-    score: f32,
-}
-
-struct SearchIndex {
-    image_ids: Vec<String>,
-    results: Vec<SearchResult>,
-    words: HashMap<String, Vec<Match>>,
-}
-
-impl SearchIndex {
-    fn new() -> Self {
-        Self {
-            image_ids: Vec::new(),
-            results: Vec::new(),
-            words: HashMap::new(),
-        }
-    }
-
-    fn serialize<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        w.write_all(&self.image_ids.len().to_le_bytes())?;
-        for id in self.image_ids.iter() {
-            w.write_all(id.as_bytes())?;
-        }
-        w.write_all(&self.results.len().to_le_bytes())?;
-        for r in self.results.iter() {
-            w.write_all(&r.image_index.to_le_bytes())?;
-            w.write_all(&r.x.to_le_bytes())?;
-            w.write_all(&r.y.to_le_bytes())?;
-        }
-        w.write_all(&self.words.len().to_le_bytes())?;
-        for (word, matches) in self.words.iter() {
-            w.write_all(&word.len().to_le_bytes())?;
-            w.write_all(word.as_bytes())?;
-            w.write_all(&matches.len().to_le_bytes())?;
-            for m in matches.iter() {
-                w.write_all(&m.result_index.to_le_bytes())?;
-                w.write_all(&m.score.to_le_bytes())?;
-            }
-        }
-        Ok(())
-    }
-}
+use mupdf::{pdf::PdfDocument, Colorspace, Matrix, TextPageOptions};
+use search_index::{SearchResult, SearchIndex, Match};
 
 fn process_lesson_pdf<P: AsRef<Path>>(path: P, index: &mut SearchIndex) {
     let doc = PdfDocument::open(path.as_ref().to_str().unwrap()).unwrap();

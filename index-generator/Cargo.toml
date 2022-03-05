@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+search-index = { path = "../search-index" }
 base64 = "0.13.0"
 deunicode = "1.3.1"
 

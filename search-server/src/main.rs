@@ -1,11 +1,16 @@
+use std::fs::File;
+
 use http_server::{HttpServer, Response};
-use image::{codecs::jpeg::JpegEncoder, ColorType};
 use pdf_search::PdfSearcher;
+use search_index::SearchIndex;
 
 mod http_server;
 mod pdf_search;
 
 fn main() {
+    let mut search_index_file = File::open("index/index.bin").unwrap();
+    let search_index = SearchIndex::deserialize(&mut search_index_file).unwrap();
+
     let pdf_searcher = PdfSearcher::new("16_integrales_a_parametres.pdf").unwrap();
     let server = HttpServer::bind("127.0.0.1:3000").unwrap();
     server
