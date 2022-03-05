@@ -1,9 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
+<title>Recherche de cours</title>
 <meta name="viewport" content="width=device-width">
 <style>
+body {
+	background: #DADADA;
+	font-family: sans-serif;
+}
+
+input {
+	font-size: 1.2em;
+}
+
 .match {
+	margin: 20px 0;
 	position: relative;
 }
 
@@ -11,12 +22,13 @@
 	position: absolute;
 	background: yellow;
 	opacity: 0.2;
+	user-select: none;
 }
 </style>
 </head>
 <body>
-<p>Que voulez vous chercher?</p>
-<input type="text" id="query" />
+<h1>Recherche de cours</h1>
+<input type="text" id="query" placeholder="Mot(s) clé(s)"/>
 <div id="matches"></div>
 <script>
 const queryInput = document.getElementById('query')
@@ -37,15 +49,16 @@ async function fetchAndUpdate (query) {
 
 		const image = document.createElement('img')
 		image.src = 'index/images/' + match.imageId + '.jpg'
+		image.setAttribute('draggable', 'false')
 		matchDiv.appendChild(image)
 
 		for (let rect of match.rects) {
 			const highlight = document.createElement('div')
 			highlight.classList.add('highlight')
-			highlight.style.top = (rect.y * 3) + 'px'
-			highlight.style.left = (rect.x * 3) + 'px'
-			highlight.style.width = (rect.width * 3) + 'px'
-			highlight.style.height = (rect.height * 3) + 'px'
+			highlight.style.top = rect.y + 'px'
+			highlight.style.left = rect.x + 'px'
+			highlight.style.width = rect.width + 'px'
+			highlight.style.height = rect.height + 'px'
 			matchDiv.appendChild(highlight)
 		}
 
@@ -66,8 +79,7 @@ async function loop() {
 // This can happen if the user inputs a query and reloads the page.
 if (queryInput.value !== '') {
 	isLooping = true
-	loop()
-		.then(() => isLooping = false)
+	loop().then(() => isLooping = false)
 }
 
 queryInput.addEventListener('input', function () {
@@ -75,8 +87,7 @@ queryInput.addEventListener('input', function () {
 		return
 	}
 	isLooping = true
-	loop()
-		.then(() => isLooping = false)
+	loop().then(() => isLooping = false)
 })
 </script>
 </body>
