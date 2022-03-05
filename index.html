@@ -16,6 +16,7 @@ input {
 .match {
 	margin: 20px 0;
 	position: relative;
+	overflow: hidden;
 }
 
 .highlight {
@@ -44,18 +45,34 @@ async function fetchAndUpdate (query) {
 
 	// Create new elements.
 	for (let match of matches) {
+		// Calculate what area should be visible.
+		let cropStart = Infinity
+		let cropEnd = 0
+		for (let rect of match.rects) {
+			const padding = 300
+			cropStart = Math.min(cropStart, rect.y - padding)
+			cropEnd = Math.max(cropEnd, rect.y + rect.height + padding)
+		}
+		cropStart = Math.max(cropStart, 0)
+
 		const matchDiv = document.createElement('div')
 		matchDiv.classList.add('match')
+		if (cropEnd !== Infinity) {
+			matchDiv.style.maxHeight = (cropEnd - cropStart) + 'px'
+		}
 
 		const image = document.createElement('img')
 		image.src = 'index/images/' + match.imageId + '.jpg'
 		image.setAttribute('draggable', 'false')
+		if (cropStart !== 0) {
+			image.style.marginTop = -cropStart + 'px'
+		}
 		matchDiv.appendChild(image)
 
 		for (let rect of match.rects) {
 			const highlight = document.createElement('div')
 			highlight.classList.add('highlight')
-			highlight.style.top = rect.y + 'px'
+			highlight.style.top = rect.y - cropStart + 'px'
 			highlight.style.left = rect.x + 'px'
 			highlight.style.width = rect.width + 'px'
 			highlight.style.height = rect.height + 'px'
