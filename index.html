@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Recherche de cours</title>
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width">
+<title>Recherche de cours</title>
 <style>
 body {
 	background: #DADADA;
 	font-family: sans-serif;
 }
 
-input {
+#query {
 	font-size: 1.2em;
 }
 
@@ -25,12 +26,33 @@ input {
 	opacity: 0.2;
 	user-select: none;
 }
+
+#top {
+	display: none;
+
+	position: fixed;
+	right: 10px;
+	bottom: 10px;
+
+	width: 50px;
+	height: 50px;
+
+	background: black;
+	color: white;
+
+	font-size: 30px;
+	text-align: center;
+	line-height: 50px;
+
+	cursor: pointer;
+}
 </style>
 </head>
 <body>
 <h1>Recherche de cours</h1>
 <input type="text" id="query" placeholder="Mot(s) clé(s)"/>
 <div id="matches"></div>
+<div id="top">↑</div>
 <script>
 const queryInput = document.getElementById('query')
 const matchesDiv = document.getElementById('matches')
@@ -106,6 +128,20 @@ queryInput.addEventListener('input', function () {
 	isLooping = true
 	loop().then(() => isLooping = false)
 })
+
+const topButton = document.getElementById('top')
+topButton.addEventListener('click', function () {
+	window.scrollTo(0, 0)
+})
+
+let topButtonVisible = false
+window.addEventListener('scroll', function () {
+	const shouldBeVisible = window.scrollY !== 0
+	if (shouldBeVisible !== topButtonVisible) {
+		topButton.style.display = shouldBeVisible ? 'block' : null
+		topButtonVisible = shouldBeVisible
+	}
+}, { passive: true })
 </script>
 </body>
 </html>
