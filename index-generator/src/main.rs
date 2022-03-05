@@ -1,10 +1,15 @@
 use std::{fs::{self, OpenOptions}, path::Path};
 
-use image::{codecs::jpeg::JpegEncoder, ColorType};
 use mupdf::{pdf::PdfDocument, Colorspace, Matrix, TextPageOptions};
 use search_index::{SearchResult, SearchIndex, Match};
 
 fn process_lesson_pdf<P: AsRef<Path>>(path: P, index: &mut SearchIndex) {
+    eprintln!("Processing {}...", path.as_ref().display());
+
+    let mut compressor = turbojpeg::Compressor::new().unwrap();
+    compressor.set_quality(50);
+    compressor.set_subsamp(turbojpeg::Subsamp::Sub2x1);
+
     let doc = PdfDocument::open(path.as_ref().to_str().unwrap()).unwrap();
     for page in doc.pages().unwrap() {
         let page = page.unwrap();
@@ -44,9 +49,13 @@ fn process_lesson_pdf<P: AsRef<Path>>(path: P, index: &mut SearchIndex) {
         }
         // TODO: fix the `alpha` parameter not being a boolean
         let pixmap = page.to_pixmap(&Matrix::new_scale(3., 3.), &Colorspace::device_rgb(), 0., false).unwrap();
-        let mut encoded = Vec::new();
-        let mut encoder = JpegEncoder::new_with_quality(&mut encoded, 50);
-        encoder.encode(pixmap.samples(), pixmap.width(), pixmap.height(), ColorType::Rgb8).unwrap();
+        let encoded = compressor.compress_to_vec(turbojpeg::Image {
+            pixels: pixmap.samples(),
+            width: pixmap.width() as usize,
+            height: pixmap.height() as usize,
+            pitch: (pixmap.width() * 3) as usize,
+            format: turbojpeg::PixelFormat::RGB,
+        }).unwrap();
         let digest = blake3::hash(&encoded);
         let id = base64::encode_config(digest.as_bytes(), base64::URL_SAFE_NO_PAD);
         index.image_ids.push(id.clone());
@@ -59,7 +68,7 @@ fn main() {
     let mut index = SearchIndex::new();
     for entry in fs::read_dir("lessons").unwrap() {
         let entry = entry.unwrap();
-        if entry.metadata().unwrap().is_file() {
+        if entry.metadata().unwrap().is_file() && entry.path().extension().map(|e| e == "pdf").unwrap_or(false) {
             process_lesson_pdf(entry.path(), &mut index);
         }
     }
