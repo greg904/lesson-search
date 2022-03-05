@@ -42,9 +42,8 @@ impl SearchIndex {
             let mut s = vec![0u8; s_len as usize];
             r.read_exact(&mut s)?;
             image_ids.push(
-                std::str::from_utf8(&s)
-                    .map_err(|_err| io::Error::new(io::ErrorKind::InvalidData, "not UTF-8"))?
-                    .to_owned(),
+                String::from_utf8(s)
+                    .map_err(|_err| io::Error::new(io::ErrorKind::InvalidData, "not UTF-8"))?,
             );
         }
         r.read_exact(&mut buf)?;
@@ -62,7 +61,13 @@ impl SearchIndex {
             let width = u16::from_le_bytes(buf);
             r.read_exact(&mut buf)?;
             let height = u16::from_le_bytes(buf);
-            results.push(SearchResult { image_index, x, y, width, height });
+            results.push(SearchResult {
+                image_index,
+                x,
+                y,
+                width,
+                height,
+            });
         }
         r.read_exact(&mut buf)?;
         let words_len = u32::from_le_bytes(buf);
@@ -86,9 +91,8 @@ impl SearchIndex {
                 });
             }
             words.insert(
-                std::str::from_utf8(&word)
-                    .map_err(|_err| io::Error::new(io::ErrorKind::InvalidData, "not UTF-8"))?
-                    .to_owned(),
+                String::from_utf8(word)
+                    .map_err(|_err| io::Error::new(io::ErrorKind::InvalidData, "not UTF-8"))?,
                 matches,
             );
         }
