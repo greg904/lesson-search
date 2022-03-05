@@ -54,6 +54,10 @@ fn main() {
                     Some(i) => i,
                     None => {
                         let i = pages.len();
+                        // Limit page count.
+                        if i > 5 {
+                            break;
+                        }
                         pages.push(PageMatch {
                             image_id: image_id.clone(),
                             rects: Vec::new(),
