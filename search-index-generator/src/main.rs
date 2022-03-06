@@ -159,9 +159,8 @@ fn build_search_index_from_document(
                     continue;
                 }
 
-                let mut words: Vec<String> = deunicode::deunicode(&line)
-                    .to_ascii_lowercase()
-                    .split(|c: char| !c.is_ascii_alphanumeric())
+                let mut words: Vec<String> = search_index::normalize(&line)
+                    .split(' ')
                     .map(|w| w.to_owned())
                     .collect();
                 if words.is_empty() {

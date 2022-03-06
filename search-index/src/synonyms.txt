@@ -1,0 +1,7 @@
+sev "sous espace vectoriel"
+bon "base orthonormale"
+tmc "theoreme moment cinetique"
+faf "formule accroissements finis"
+taf "theoreme accroissements finis"
+iaf "inegalite accroissements finis"
+fini finie

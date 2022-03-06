@@ -3,6 +3,8 @@ use std::{
     io::{self, Read, Write},
 };
 
+include!(concat!(env!("OUT_DIR"), "/synonyms.rs"));
+
 fn deserialize_u32<R: Read>(r: &mut R) -> io::Result<u32> {
     let mut buf = [0u8; 4];
     r.read_exact(&mut buf)?;
@@ -208,4 +210,18 @@ impl SearchIndex {
 
         Ok(())
     }
+}
+
+pub fn normalize(s: &str) -> String {
+    let mut normalized = deunicode::deunicode(s)
+        .to_ascii_lowercase()
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .collect::<Vec<_>>()
+        .join(" ");
+    for (canonical, synonyms) in SYNONYMS.iter() {
+        for s in synonyms.iter() {
+            normalized = normalized.replace(s, canonical);
+        }
+    }
+    normalized
 }

@@ -40,9 +40,8 @@ fn main() {
     server
         .serve(|req| {
             let query = urlencoding::decode(&req.url[1..]).unwrap();
-            let words: Vec<String> = deunicode::deunicode(&query)
-                .to_ascii_lowercase()
-                .split(|c: char| !c.is_ascii_alphanumeric())
+            let words: Vec<String> = search_index::normalize(&query)
+                .split(' ')
                 .map(|w| w.to_owned())
                 .collect();
             let mut scores: BTreeMap<u32, f32> = BTreeMap::new();
