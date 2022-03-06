@@ -154,12 +154,16 @@ fn build_search_index_from_document(
                     }
                 }
 
-                let line: String = l.chars().flat_map(|c| c.char()).collect();
-                if line.is_empty() {
+                let line: String = l.chars()
+                    .flat_map(|c| c.char())
+                    .collect();
+
+                let normalized = search_index::normalize(&line);
+                if normalized.is_empty() {
                     continue;
                 }
 
-                let mut words: Vec<String> = search_index::normalize(&line)
+                let mut words: Vec<String> = normalized
                     .split(' ')
                     .map(|w| w.to_owned())
                     .collect();
