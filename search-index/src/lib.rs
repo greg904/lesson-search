@@ -231,6 +231,15 @@ pub fn normalize(s: &str) -> String {
             deunicode::deunicode(&w)
                 .split(|c: char| !c.is_ascii_alphanumeric())
                 .filter(|p| p.len() > 1)
+                // Ignore common words
+                .filter(|p| {
+                    ![
+                        "le", "la", "de", "un", "et", "en", "que", "dan", "pour", "ce", "qui",
+                        "ne", "se", "sur", "pas", "par", "on", "mais", "ou", "comm", "il", "est",
+                        "du", "lorsqu", "express", "une",
+                    ]
+                    .contains(p)
+                })
                 .collect::<Vec<_>>()
                 .join(" ")
         })
