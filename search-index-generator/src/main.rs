@@ -13,10 +13,16 @@ use search_index::{Match, Page, SearchIndex, SearchResult};
 
 type ImageId = String;
 
-type PageRenderCache = HashMap<u32, ImageId>;
+type PageRenderCache = HashMap<u16, ImageId>;
 
 struct DocumentRenderCache {
     by_path: HashMap<String, PageRenderCache>,
+}
+
+fn deserialize_u16<R: Read>(r: &mut R) -> io::Result<u16> {
+    let mut buf = [0u8; 2];
+    r.read_exact(&mut buf)?;
+    Ok(u16::from_le_bytes(buf))
 }
 
 fn deserialize_u32<R: Read>(r: &mut R) -> io::Result<u32> {
@@ -31,8 +37,7 @@ fn deserialize_string<R: Read>(r: &mut R) -> io::Result<String> {
     let mut s = vec![0u8; len as usize];
     r.read_exact(&mut s)?;
 
-    Ok(String::from_utf8(s)
-        .map_err(|_err| io::Error::new(io::ErrorKind::InvalidData, "not UTF-8"))?)
+    String::from_utf8(s).map_err(|_err| io::Error::new(io::ErrorKind::InvalidData, "not UTF-8"))
 }
 
 impl DocumentRenderCache {
@@ -43,11 +48,11 @@ impl DocumentRenderCache {
     }
 
     fn serialize<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        w.write_all(&(self.by_path.len() as u32).to_le_bytes())?;
+        w.write_all(&(self.by_path.len() as u16).to_le_bytes())?;
         for (path, pages) in self.by_path.iter() {
             w.write_all(&(path.len() as u32).to_le_bytes())?;
             w.write_all(path.as_bytes())?;
-            w.write_all(&(pages.len() as u32).to_le_bytes())?;
+            w.write_all(&(pages.len() as u16).to_le_bytes())?;
             for (page, id) in pages.iter() {
                 w.write_all(&page.to_le_bytes())?;
                 w.write_all(&(id.len() as u32).to_le_bytes())?;
@@ -58,14 +63,14 @@ impl DocumentRenderCache {
     }
 
     fn deserialize<R: Read>(r: &mut R) -> io::Result<Self> {
-        let doc_count = deserialize_u32(r)?;
+        let doc_count = deserialize_u16(r)?;
         let mut by_path = HashMap::with_capacity(doc_count as usize);
         for _ in 0..doc_count {
             let path = deserialize_string(r)?;
             let page_count = deserialize_u32(r)?;
             let mut page_cache = HashMap::with_capacity(page_count as usize);
             for _ in 0..page_count {
-                let page = deserialize_u32(r)?;
+                let page = deserialize_u16(r)?;
                 let id = deserialize_string(r)?;
                 page_cache.insert(page, id);
             }
@@ -78,37 +83,38 @@ impl DocumentRenderCache {
 fn find_first_useful_outline(outlines: &[Outline]) -> Option<&Outline> {
     let o = outlines
         .iter()
-        .filter(|o| !o.title.eq_ignore_ascii_case("table des matières"))
-        .next()?;
+        .find(|o| !o.title.eq_ignore_ascii_case("table des matières"))?;
     if o.down.is_empty() {
         return Some(o);
     }
     find_first_useful_outline(&o.down)
 }
 
-fn build_search_index_from_document<P: AsRef<Path>>(
-    document_path: P,
+fn build_search_index_from_document(
+    document_path: &Path,
+    rendered_pages_path: &Path,
     document_render_cache: &RwLock<DocumentRenderCache>,
 ) -> SearchIndex {
-    eprintln!("Processing {}...", document_path.as_ref().display());
+    eprintln!("Processing {}...", document_path.display());
 
     let mut encoder = jpegxl_rs::encoder_builder()
         .lossless(true)
         .speed(jpegxl_rs::encode::EncoderSpeed::Tortoise)
+        .decoding_speed(1)
         .build()
         .unwrap();
 
-    let document_path_str = document_path.as_ref().as_os_str().to_str().unwrap();
+    let document_name = document_path.file_name().unwrap().to_str().unwrap();
 
     {
         let mut c = document_render_cache.write().unwrap();
-        if !c.by_path.contains_key(document_path_str) {
+        if !c.by_path.contains_key(document_name) {
             c.by_path
-                .insert(document_path_str.to_owned(), PageRenderCache::new());
+                .insert(document_name.to_owned(), PageRenderCache::new());
         }
     }
 
-    let doc = PdfDocument::open(document_path.as_ref().to_str().unwrap()).unwrap();
+    let doc = PdfDocument::open(document_path.to_str().unwrap()).unwrap();
 
     // Ignore header and table of content by looking at the first outline that is not the table of
     // content, if there is one.
@@ -117,7 +123,7 @@ fn build_search_index_from_document<P: AsRef<Path>>(
     let content_start = first_useful_outline.map(|o| (o.page.unwrap(), o.y));
 
     let mut search_index = SearchIndex::new();
-    search_index.documents.push(document_path_str.to_owned());
+    search_index.documents.push(document_name.to_owned());
 
     for (page_nr, page) in doc.pages().unwrap().enumerate() {
         let page = page.unwrap();
@@ -179,14 +185,14 @@ fn build_search_index_from_document<P: AsRef<Path>>(
         // Encode image for the page or reuse existing one.
         let image_id = {
             let c = document_render_cache.read().unwrap();
-            let d = c.by_path.get(document_path_str).unwrap();
-            d.get(&(page_nr as u32)).cloned()
+            let d = c.by_path.get(document_name).unwrap();
+            d.get(&(page_nr as u16)).cloned()
         }
         .unwrap_or_else(|| {
             eprintln!(
                 "Encoding page {} of {}...",
                 page_index,
-                document_path.as_ref().display()
+                document_path.display()
             );
             // TODO: fix the `alpha` parameter not being a boolean
             let pixmap = page
@@ -202,11 +208,11 @@ fn build_search_index_from_document<P: AsRef<Path>>(
                 .unwrap();
             let digest = blake3::hash(&encoded);
             let id = base64::encode_config(digest.as_bytes(), base64::URL_SAFE_NO_PAD);
-            fs::write(format!("index/images/{}.jxl", id), &*encoded).unwrap();
+            fs::write(rendered_pages_path.join(format!("{}.jxl", id)), &*encoded).unwrap();
 
             let mut c = document_render_cache.write().unwrap();
-            let d = c.by_path.get_mut(document_path_str).unwrap();
-            d.insert(page_index as u32, id.clone());
+            let d = c.by_path.get_mut(document_name).unwrap();
+            d.insert(page_index as u16, id.clone());
 
             id
         });
@@ -226,9 +232,9 @@ fn build_search_index_from_document<P: AsRef<Path>>(
 
 fn main() {
     let lessons_dir: PathBuf = env::var_os("LESSONS_DIR")
-        .unwrap_or("lessons".into())
+        .unwrap_or_else(|| "lessons".into())
         .into();
-    let out_dir: PathBuf = env::var_os("OUT_DIR").unwrap_or("db".into()).into();
+    let out_dir: PathBuf = env::var_os("OUT_DIR").unwrap_or_else(|| "db".into()).into();
 
     fs::create_dir_all(&out_dir).unwrap();
 
@@ -239,7 +245,8 @@ fn main() {
     };
     let document_render_cache = RwLock::new(document_render_cache);
 
-    if let Err(e) = fs::create_dir(out_dir.join("rendered-pages")) {
+    let rendered_pages_path = out_dir.join("rendered-pages");
+    if let Err(e) = fs::create_dir(&rendered_pages_path) {
         if e.kind() != io::ErrorKind::AlreadyExists {
             panic!("failed to create rendered-pages directory");
         }
@@ -254,7 +261,13 @@ fn main() {
             e.metadata().unwrap().is_file()
                 && e.path().extension().map(|e| e == "pdf").unwrap_or(false)
         })
-        .map(|e| build_search_index_from_document(e.path(), &document_render_cache))
+        .map(|e| {
+            build_search_index_from_document(
+                &e.path(),
+                &rendered_pages_path,
+                &document_render_cache,
+            )
+        })
         .for_each(|mut partial_index| {
             // Merge partial index into global index.
             let mut i = search_index.lock().unwrap();

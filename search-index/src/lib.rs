@@ -33,8 +33,7 @@ fn deserialize_string<R: Read>(r: &mut R) -> io::Result<String> {
     let mut s = vec![0u8; len as usize];
     r.read_exact(&mut s)?;
 
-    Ok(String::from_utf8(s)
-        .map_err(|_err| io::Error::new(io::ErrorKind::InvalidData, "not UTF-8"))?)
+    String::from_utf8(s).map_err(|_err| io::Error::new(io::ErrorKind::InvalidData, "not UTF-8"))
 }
 
 fn deserialize_vec_string<R: Read>(r: &mut R) -> io::Result<Vec<String>> {
@@ -114,7 +113,7 @@ impl Match {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct SearchIndex {
     pub documents: Vec<String>,
     pub pages: Vec<Page>,
@@ -124,12 +123,7 @@ pub struct SearchIndex {
 
 impl SearchIndex {
     pub fn new() -> Self {
-        Self {
-            documents: Vec::new(),
-            pages: Vec::new(),
-            results: Vec::new(),
-            words: HashMap::new(),
-        }
+        Default::default()
     }
 
     pub fn deserialize<R: Read>(r: &mut R) -> io::Result<Self> {

@@ -56,11 +56,7 @@ fn serve_stream<F: FnMut(Request) -> Response>(
             200 => "OK",
             _ => "Unknown",
         };
-        write!(
-            res_bytes,
-            "HTTP/1.1 {} {}",
-            res.status_code, human_code
-        )?;
+        write!(res_bytes, "HTTP/1.1 {} {}", res.status_code, human_code)?;
         for header in res.headers.iter() {
             write!(res_bytes, "\r\n{}: {}", header.0, header.1)?;
         }
@@ -69,10 +65,10 @@ fn serve_stream<F: FnMut(Request) -> Response>(
         stream.write_all(&res_bytes)?;
         return Ok(());
     }
-    return Err(io::Error::new(
+    Err(io::Error::new(
         io::ErrorKind::InvalidData,
         "invalid HTTP request",
-    ));
+    ))
 }
 
 impl HttpServer {

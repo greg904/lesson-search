@@ -14,7 +14,7 @@ body {
 	font-size: 1.2em;
 }
 
-.match {
+.page {
 	margin: 20px 0;
 	position: relative;
 	overflow-y: hidden;
@@ -63,70 +63,72 @@ body {
 <body>
 <h1>Recherche de cours</h1>
 <input type="text" id="query" placeholder="Mot(s) clé(s)"/>
-<div id="matches"></div>
+<div id="pages"></div>
 <div id="top">↑</div>
 <script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui@4.0/dist/fancybox.umd.js"></script>
 <script>
+const isDevelopment = location.origin === 'http://localhost:8000'
+const queryEndpoint = isDevelopment ? 'http://localhost:3000/' : 'https://mp1.mpsi1.fr/cours/api/'
+const renderedPageEndpoint = isDevelopment ? '/db/rendered-pages/' : 'https://mp1.mpsi1.fr/cours/pages/'
+const documentEndpoint = isDevelopment ? '/' : 'https://mp1.mpsi1.fr/cours/'
+const pdfJsRoot = isDevelopment ? '/pdfjs/' : 'https://mp1.mpsi1.fr/cours/pdfjs/'
+
 const queryInput = document.getElementById('query')
-const matchesDiv = document.getElementById('matches')
+const pagesDiv = document.getElementById('pages')
 let isLooping = false
 
 async function fetchAndUpdate (query) {
-	const res = await fetch('http://localhost:3000/' + encodeURIComponent(query))
-	const matches = await res.json()
+	const res = await fetch(queryEndpoint + encodeURIComponent(query))
+	const pages = await res.json()
 
 	// Remove all previous results.
-	matchesDiv.innerHTML = ''
+	pagesDiv.innerHTML = ''
 
 	// Create new elements.
-	for (let match of matches) {
+	for (let page of pages) {
 		// Calculate what area should be visible.
 		let cropStart = Infinity
 		let cropEnd = 0
-		for (let rect of match.rects) {
+		for (let rect of page.rects) {
 			const padding = 300
 			cropStart = Math.min(cropStart, rect.y - padding)
 			cropEnd = Math.max(cropEnd, rect.y + rect.height + padding)
 		}
 		cropStart = Math.max(cropStart, 0)
 
-		const matchDiv = document.createElement('div')
-		matchDiv.classList.add('match')
+		const pageDiv = document.createElement('div')
+		pageDiv.classList.add('page')
 		if (cropEnd !== Infinity) {
-			matchDiv.style.maxHeight = (cropEnd - cropStart) + 'px'
+			pageDiv.style.maxHeight = (cropEnd - cropStart) + 'px'
 		}
 
 		const image = document.createElement('img')
-		image.src = 'index/images/' + match.renderedImageId + '.jxl'
+		image.src = renderedPageEndpoint + page.renderedImageId + '.jxl'
 		image.setAttribute('draggable', 'false')
 		if (cropStart !== 0) {
 			image.style.marginTop = -cropStart + 'px'
 		}
-		matchDiv.appendChild(image)
+		pageDiv.appendChild(image)
 
-		for (let rect of match.rects) {
+		for (let rect of page.rects) {
 			const highlight = document.createElement('div')
 			highlight.classList.add('highlight')
 			highlight.style.top = rect.y - cropStart + 'px'
 			highlight.style.left = rect.x + 'px'
 			highlight.style.width = rect.width + 'px'
 			highlight.style.height = rect.height + 'px'
-			matchDiv.appendChild(highlight)
+			pageDiv.appendChild(highlight)
 		}
 
 		const openLink = document.createElement('a')
 		openLink.classList.add('open-link')
-		openLink.href = match.document + '#page=' + match.pageNr
+		openLink.href = 'pdfjs/web/viewer.html?file=' + documentEndpoint + page.document + '#page=' + page.pageNr
 		openLink.textContent = 'Ouvrir PDF'
-		// Use an embedded viewer for browsers that don't have one.
-		if (navigator.userAgent.indexOf('Chrome') !== -1 &&
-				navigator.userAgent.indexOf('Android') !== -1) {
-			openLink.setAttribute('data-fancybox', '')
-			openLink.setAttribute('data-type', 'pdf')
-		}
-		matchDiv.appendChild(openLink)
+		openLink.setAttribute('data-fancybox', '')
+		openLink.setAttribute('data-type', 'pdf')
+		pageDiv.appendChild(openLink)
 
-		matchesDiv.appendChild(matchDiv)
+		pagesDiv.appendChild(pageDiv)
 	}
 }
 
