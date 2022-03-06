@@ -159,7 +159,7 @@ fn build_search_index_from_document(
                     continue;
                 }
 
-                let words: Vec<String> = deunicode::deunicode(&line)
+                let mut words: Vec<String> = deunicode::deunicode(&line)
                     .to_ascii_lowercase()
                     .split(|c: char| !c.is_ascii_alphanumeric())
                     .map(|w| w.to_owned())
@@ -170,11 +170,16 @@ fn build_search_index_from_document(
 
                 let mut score = 1.;
                 // Heuristic for font size.
-                score *= (bounds.x1 - bounds.x0) * (bounds.y1 - bounds.y0) / (line.len() as f32);
+                let font_size = ((bounds.x1 - bounds.x0) * (bounds.y1 - bounds.y0) / (line.len() as f32)).sqrt();
+                score += (font_size / 5.) / (1. + font_size / 5.);
                 // Boost certain patterns.
                 if words.len() >= 2 && (words[0] == "theoreme" || words[0] == "definition") {
-                    score *= 5.;
+                    score += 1.;
                 }
+
+                // Remove duplicate words to prevent counting them multiple times for a single line.
+                words.sort();
+                words.dedup();
 
                 let result_index = search_index.results.len();
                 search_index.results.push(SearchResult {
