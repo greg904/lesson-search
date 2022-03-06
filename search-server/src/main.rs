@@ -18,7 +18,9 @@ struct Rect {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PageMatch {
-    image_id: String,
+    document: String,
+    page_nr: u16,
+    rendered_image_id: String,
     rects: Vec<Rect>,
 }
 
@@ -49,8 +51,9 @@ fn main() {
             let mut pages: Vec<PageMatch> = Vec::new();
             for (r, _) in sorted.iter() {
                 let result = &search_index.results[*r as usize];
-                let image_id = &search_index.image_ids[result.image_index as usize];
-                let page_index = match pages.iter().position(|p| &p.image_id == image_id) {
+                let page = &search_index.pages[result.page_index as usize];
+                let document = &search_index.documents[page.document_index as usize];
+                let page_index = match pages.iter().position(|p| p.rendered_image_id == page.rendered_image_id) {
                     Some(i) => i,
                     None => {
                         let i = pages.len();
@@ -59,7 +62,9 @@ fn main() {
                             break;
                         }
                         pages.push(PageMatch {
-                            image_id: image_id.clone(),
+                            document: document.clone(),
+                            page_nr: page.page_nr,
+                            rendered_image_id: page.rendered_image_id.clone(),
                             rects: Vec::new(),
                         });
                         i

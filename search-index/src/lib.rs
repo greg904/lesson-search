@@ -3,13 +3,97 @@ use std::{
     io::{self, Read, Write},
 };
 
+fn deserialize_u32<R: Read>(r: &mut R) -> io::Result<u32> {
+    let mut buf = [0u8; 4];
+    r.read_exact(&mut buf)?;
+    Ok(u32::from_le_bytes(buf))
+}
+
+fn deserialize_f32<R: Read>(r: &mut R) -> io::Result<f32> {
+    let mut buf = [0u8; 4];
+    r.read_exact(&mut buf)?;
+    Ok(f32::from_le_bytes(buf))
+}
+
+fn deserialize_u16<R: Read>(r: &mut R) -> io::Result<u16> {
+    let mut buf = [0u8; 2];
+    r.read_exact(&mut buf)?;
+    Ok(u16::from_le_bytes(buf))
+}
+
+fn deserialize_i16<R: Read>(r: &mut R) -> io::Result<i16> {
+    let mut buf = [0u8; 2];
+    r.read_exact(&mut buf)?;
+    Ok(i16::from_le_bytes(buf))
+}
+
+fn deserialize_string<R: Read>(r: &mut R) -> io::Result<String> {
+    let len = deserialize_u32(r)?;
+
+    let mut s = vec![0u8; len as usize];
+    r.read_exact(&mut s)?;
+
+    Ok(String::from_utf8(s)
+        .map_err(|_err| io::Error::new(io::ErrorKind::InvalidData, "not UTF-8"))?)
+}
+
+fn deserialize_vec_string<R: Read>(r: &mut R) -> io::Result<Vec<String>> {
+    let count = deserialize_u32(r)?;
+
+    let mut vec = Vec::with_capacity(count as usize);
+    for _ in 0..count {
+        vec.push(deserialize_string(r)?);
+    }
+
+    Ok(vec)
+}
+
+#[derive(Clone)]
+pub struct Page {
+    pub document_index: u16,
+    pub page_nr: u16,
+    pub rendered_image_id: String,
+}
+
+impl Page {
+    fn deserialize<R: Read>(r: &mut R) -> io::Result<Self> {
+        let document_index = deserialize_u16(r)?;
+        let page_nr = deserialize_u16(r)?;
+        let rendered_image_id = deserialize_string(r)?;
+
+        Ok(Self {
+            document_index,
+            page_nr,
+            rendered_image_id,
+        })
+    }
+}
+
 #[derive(Clone)]
 pub struct SearchResult {
-    pub image_index: u32,
+    pub page_index: u32,
     pub x: i16,
     pub y: i16,
     pub width: u16,
     pub height: u16,
+}
+
+impl SearchResult {
+    fn deserialize<R: Read>(r: &mut R) -> io::Result<SearchResult> {
+        let page_index = deserialize_u32(r)?;
+        let x = deserialize_i16(r)?;
+        let y = deserialize_i16(r)?;
+        let width = deserialize_u16(r)?;
+        let height = deserialize_u16(r)?;
+
+        Ok(SearchResult {
+            page_index,
+            x,
+            y,
+            width,
+            height,
+        })
+    }
 }
 
 #[derive(Clone)]
@@ -18,8 +102,22 @@ pub struct Match {
     pub score: f32,
 }
 
+impl Match {
+    fn deserialize<R: Read>(r: &mut R) -> io::Result<Match> {
+        let result_index = deserialize_u32(r)?;
+        let score = deserialize_f32(r)?;
+
+        Ok(Match {
+            result_index,
+            score,
+        })
+    }
+}
+
+#[derive(Clone)]
 pub struct SearchIndex {
-    pub image_ids: Vec<String>,
+    pub documents: Vec<String>,
+    pub pages: Vec<Page>,
     pub results: Vec<SearchResult>,
     pub words: HashMap<String, Vec<Match>>,
 }
@@ -27,98 +125,74 @@ pub struct SearchIndex {
 impl SearchIndex {
     pub fn new() -> Self {
         Self {
-            image_ids: Vec::new(),
+            documents: Vec::new(),
+            pages: Vec::new(),
             results: Vec::new(),
             words: HashMap::new(),
         }
     }
 
     pub fn deserialize<R: Read>(r: &mut R) -> io::Result<Self> {
-        let mut buf = [0u8; 4];
-        r.read_exact(&mut buf)?;
-        let image_ids_len = u32::from_le_bytes(buf);
-        let mut image_ids = Vec::with_capacity(image_ids_len as usize);
-        for _ in 0..image_ids_len {
-            r.read_exact(&mut buf)?;
-            let s_len = u32::from_le_bytes(buf);
-            let mut s = vec![0u8; s_len as usize];
-            r.read_exact(&mut s)?;
-            image_ids.push(
-                String::from_utf8(s)
-                    .map_err(|_err| io::Error::new(io::ErrorKind::InvalidData, "not UTF-8"))?,
-            );
+        let documents = deserialize_vec_string(r)?;
+
+        let page_count = deserialize_u32(r)?;
+        let mut pages = Vec::with_capacity(page_count as usize);
+        for _ in 0..page_count {
+            pages.push(Page::deserialize(r)?);
         }
-        r.read_exact(&mut buf)?;
-        let results_len = u32::from_le_bytes(buf);
-        let mut results = Vec::with_capacity(results_len as usize);
-        for _ in 0..results_len {
-            r.read_exact(&mut buf)?;
-            let image_index = u32::from_le_bytes(buf);
-            let mut buf = [0u8; 2];
-            r.read_exact(&mut buf)?;
-            let x = i16::from_le_bytes(buf);
-            r.read_exact(&mut buf)?;
-            let y = i16::from_le_bytes(buf);
-            r.read_exact(&mut buf)?;
-            let width = u16::from_le_bytes(buf);
-            r.read_exact(&mut buf)?;
-            let height = u16::from_le_bytes(buf);
-            results.push(SearchResult {
-                image_index,
-                x,
-                y,
-                width,
-                height,
-            });
+
+        let result_count = deserialize_u32(r)?;
+        let mut results = Vec::with_capacity(result_count as usize);
+        for _ in 0..result_count {
+            results.push(SearchResult::deserialize(r)?);
         }
-        r.read_exact(&mut buf)?;
-        let words_len = u32::from_le_bytes(buf);
-        let mut words = HashMap::with_capacity(words_len as usize);
-        for _ in 0..words_len {
-            r.read_exact(&mut buf)?;
-            let word_len = u32::from_le_bytes(buf);
-            let mut word = vec![0u8; word_len as usize];
-            r.read_exact(&mut word)?;
-            r.read_exact(&mut buf)?;
-            let matches_len = u32::from_le_bytes(buf);
-            let mut matches = Vec::with_capacity(matches_len as usize);
-            for _ in 0..matches_len {
-                r.read_exact(&mut buf)?;
-                let result_index = u32::from_le_bytes(buf);
-                r.read_exact(&mut buf)?;
-                let score = f32::from_le_bytes(buf);
-                matches.push(Match {
-                    result_index,
-                    score,
-                });
+
+        let word_count = deserialize_u32(r)?;
+        let mut words = HashMap::with_capacity(word_count as usize);
+        for _ in 0..word_count {
+            let word = deserialize_string(r)?;
+
+            let match_count = deserialize_u32(r)?;
+            let mut matches = Vec::with_capacity(match_count as usize);
+            for _ in 0..match_count {
+                matches.push(Match::deserialize(r)?);
             }
-            words.insert(
-                String::from_utf8(word)
-                    .map_err(|_err| io::Error::new(io::ErrorKind::InvalidData, "not UTF-8"))?,
-                matches,
-            );
+
+            words.insert(word, matches);
         }
+
         Ok(Self {
-            image_ids,
+            documents,
+            pages,
             results,
             words,
         })
     }
 
     pub fn serialize<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        w.write_all(&(self.image_ids.len() as u32).to_le_bytes())?;
-        for id in self.image_ids.iter() {
-            w.write_all(&(id.len() as u32).to_le_bytes())?;
-            w.write_all(id.as_bytes())?;
+        w.write_all(&(self.documents.len() as u32).to_le_bytes())?;
+        for doc in self.documents.iter() {
+            w.write_all(&(doc.len() as u32).to_le_bytes())?;
+            w.write_all(doc.as_bytes())?;
         }
+
+        w.write_all(&(self.pages.len() as u32).to_le_bytes())?;
+        for page in self.pages.iter() {
+            w.write_all(&page.document_index.to_le_bytes())?;
+            w.write_all(&page.page_nr.to_le_bytes())?;
+            w.write_all(&(page.rendered_image_id.len() as u32).to_le_bytes())?;
+            w.write_all(page.rendered_image_id.as_bytes())?;
+        }
+
         w.write_all(&(self.results.len() as u32).to_le_bytes())?;
         for r in self.results.iter() {
-            w.write_all(&r.image_index.to_le_bytes())?;
+            w.write_all(&r.page_index.to_le_bytes())?;
             w.write_all(&r.x.to_le_bytes())?;
             w.write_all(&r.y.to_le_bytes())?;
             w.write_all(&r.width.to_le_bytes())?;
             w.write_all(&r.height.to_le_bytes())?;
         }
+
         w.write_all(&(self.words.len() as u32).to_le_bytes())?;
         for (word, matches) in self.words.iter() {
             w.write_all(&(word.len() as u32).to_le_bytes())?;
@@ -129,6 +203,7 @@ impl SearchIndex {
                 w.write_all(&m.score.to_le_bytes())?;
             }
         }
+
         Ok(())
     }
 }

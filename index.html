@@ -17,7 +17,7 @@ body {
 .match {
 	margin: 20px 0;
 	position: relative;
-	overflow: hidden;
+	overflow-y: hidden;
 }
 
 .highlight {
@@ -25,6 +25,17 @@ body {
 	background: yellow;
 	opacity: 0.2;
 	user-select: none;
+}
+
+.open-link {
+	position: absolute;
+	top: 0;
+	left: 0;
+
+	padding: 10px;
+
+	background: rgba(0, 0, 0, 0.5);
+	color: white;
 }
 
 #top {
@@ -47,12 +58,14 @@ body {
 	cursor: pointer;
 }
 </style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@4.0/dist/fancybox.css" />
 </head>
 <body>
 <h1>Recherche de cours</h1>
 <input type="text" id="query" placeholder="Mot(s) clé(s)"/>
 <div id="matches"></div>
 <div id="top">↑</div>
+<script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui@4.0/dist/fancybox.umd.js"></script>
 <script>
 const queryInput = document.getElementById('query')
 const matchesDiv = document.getElementById('matches')
@@ -84,7 +97,7 @@ async function fetchAndUpdate (query) {
 		}
 
 		const image = document.createElement('img')
-		image.src = 'index/images/' + match.imageId + '.jxl'
+		image.src = 'index/images/' + match.renderedImageId + '.jxl'
 		image.setAttribute('draggable', 'false')
 		if (cropStart !== 0) {
 			image.style.marginTop = -cropStart + 'px'
@@ -100,6 +113,18 @@ async function fetchAndUpdate (query) {
 			highlight.style.height = rect.height + 'px'
 			matchDiv.appendChild(highlight)
 		}
+
+		const openLink = document.createElement('a')
+		openLink.classList.add('open-link')
+		openLink.href = match.document + '#page=' + match.pageNr
+		openLink.textContent = 'Ouvrir PDF'
+		// Use an embedded viewer for browsers that don't have one.
+		if (navigator.userAgent.indexOf('Chrome') !== -1 &&
+				navigator.userAgent.indexOf('Android') !== -1) {
+			openLink.setAttribute('data-fancybox', '')
+			openLink.setAttribute('data-type', 'pdf')
+		}
+		matchDiv.appendChild(openLink)
 
 		matchesDiv.appendChild(matchDiv)
 	}
