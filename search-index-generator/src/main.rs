@@ -100,7 +100,7 @@ fn build_search_index_from_document(
     let mut encoder = jpegxl_rs::encoder_builder()
         .lossless(true)
         .speed(jpegxl_rs::encode::EncoderSpeed::Tortoise)
-        .decoding_speed(1)
+        .decoding_speed(2)
         .build()
         .unwrap();
 
@@ -128,7 +128,7 @@ fn build_search_index_from_document(
     for (page_nr, page) in doc.pages().unwrap().enumerate() {
         let page = page.unwrap();
 
-        const SCALE: f32 = 3.;
+        const SCALE: f32 = 2.;
 
         // Scan the page for text.
         if let Some((start_page_nr, _start_y)) = content_start {
