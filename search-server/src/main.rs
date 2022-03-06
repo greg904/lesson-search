@@ -52,7 +52,6 @@ fn main() {
                     .split(' ')
                     .map(|w| w.to_owned())
                     .collect();
-
                 let mut pages: BTreeMap<u32, (Vec<u32>, HashMap<String, f32>)> = BTreeMap::new();
                 for w in words.iter() {
                     if let Some(matches) = search_index.words.get(w) {
