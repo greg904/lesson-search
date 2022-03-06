@@ -53,7 +53,10 @@ fn main() {
                 let result = &search_index.results[*r as usize];
                 let page = &search_index.pages[result.page_index as usize];
                 let document = &search_index.documents[page.document_index as usize];
-                let page_index = match pages.iter().position(|p| p.rendered_image_id == page.rendered_image_id) {
+                let page_index = match pages
+                    .iter()
+                    .position(|p| p.rendered_image_id == page.rendered_image_id)
+                {
                     Some(i) => i,
                     None => {
                         let i = pages.len();
@@ -81,7 +84,10 @@ fn main() {
             Response {
                 status_code: 200,
                 headers: vec![
-                    ("Access-Control-Allow-Origin".to_string(), "http://localhost:8000".to_string()),
+                    (
+                        "Access-Control-Allow-Origin".to_string(),
+                        "http://localhost:8000".to_string(),
+                    ),
                     ("Content-Length".to_string(), body.len().to_string()),
                 ],
                 body,
