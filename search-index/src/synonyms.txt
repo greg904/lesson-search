@@ -1,11 +1,10 @@
-sev "sous espace vectoriel" "sous espace"
-bon "base orthonormale"
-tmc "theoreme moment cinetique"
-faf "formule accroissements finis"
-taf "theoreme accroissements finis"
-iaf "inegalite accroissements finis"
-fini finie
-projete projecteur projection
-df "dimension finie"
+sev "sous espac vectoriel" "sous espac"
+bon "bas orthonormal"
+tmc "theorem moment cinet"
+faf "formul accroissement fin"
+taf "theorem accroissement fin"
+iaf "inegalit accroissement fin"
+projet projecteur project
+df "dimens fin"
 cs "cauchy schwarz"
 ps "produit scalaire"

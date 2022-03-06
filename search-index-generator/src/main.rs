@@ -176,7 +176,7 @@ fn build_search_index_from_document(
                     .sqrt();
                 score += (font_size / 5.) / (1. + font_size / 5.);
                 // Boost certain patterns. Note that the words are stemmed.
-                if words.len() >= 2 && (words[0] == "theorem" || words[0] == "definit") {
+                if words.len() >= 2 && (words[0] == "theorem" || words[0] == "definit" || words[0] == "propriet" || words[0] == "method") {
                     score += 0.8;
                 }
 

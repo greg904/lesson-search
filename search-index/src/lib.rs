@@ -218,7 +218,15 @@ pub fn normalize(s: &str) -> String {
     let stemmer = Stemmer::create(Algorithm::French);
     let mut normalized = s
         .split(|c: char| !c.is_alphanumeric())
-        .map(|w| stemmer.stem(w).to_lowercase())
+        .map(|w| {
+            let w = w.to_lowercase();
+            // The stemmer converts "cs" (Cauchy-Schwarz) into "c" which we do not want.
+            if w == "cs" {
+                w
+            } else {
+                stemmer.stem(&w).to_lowercase()
+            }
+        })
         .map(|w| {
             deunicode::deunicode(&w)
                 .split(|c: char| !c.is_ascii_alphanumeric())
@@ -231,8 +239,23 @@ pub fn normalize(s: &str) -> String {
         .join(" ");
     for (canonical, synonyms) in SYNONYMS.iter() {
         for s in synonyms.iter() {
-            // TODO: replace on word boundaries only
-            normalized = normalized.replace(s, canonical);
+            let mut search = 0;
+            while let Some(mut p) = normalized.get(search..).and_then(|c| c.find(s)) {
+                p += search;
+
+                search = p + s.len();
+                // Check if we are at a word boundary
+                if (p != 0 && normalized.as_bytes()[p - 1] != b' ')
+                    || (p + s.len() < normalized.len()
+                        && normalized.as_bytes()[p + s.len()] != b' ')
+                {
+                    continue;
+                }
+
+                normalized = normalized.get(..p).unwrap().to_owned()
+                    + canonical
+                    + normalized.get((p + s.len())..).unwrap();
+            }
         }
     }
     normalized
