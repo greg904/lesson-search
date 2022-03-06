@@ -770,6 +770,9 @@ checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 [[package]]
 name = "search-index"
 version = "0.1.0"
+dependencies = [
+ "deunicode",
+]
 
 [[package]]
 name = "search-index-generator"
@@ -777,7 +780,6 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "blake3",
- "deunicode",
  "jpegxl-rs",
  "mupdf",
  "rayon",
@@ -788,7 +790,6 @@ dependencies = [
 name = "search-server"
 version = "0.1.0"
 dependencies = [
- "deunicode",
  "libc",
  "search-index",
  "serde",
