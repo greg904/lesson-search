@@ -3,15 +3,29 @@ use std::{
     fs::{self, File, OpenOptions},
     io::{self, Read, Write},
     path::Path,
+    sync::{Mutex, RwLock},
 };
 
 use mupdf::{pdf::PdfDocument, Colorspace, Matrix, Outline, TextPageOptions};
+use rayon::prelude::*;
 use search_index::{Match, SearchIndex, SearchResult};
 
 type ImageId = String;
 
+struct ImageCacheDocument {
+    by_page: HashMap<u32, ImageId>,
+}
+
+impl ImageCacheDocument {
+    fn new() -> Self {
+        Self {
+            by_page: HashMap::new(),
+        }
+    }
+}
+
 struct ImageCache {
-    by_path: HashMap<String, Vec<ImageId>>,
+    by_path: HashMap<String, ImageCacheDocument>,
 }
 
 impl ImageCache {
@@ -23,11 +37,12 @@ impl ImageCache {
 
     fn serialize<W: Write>(&self, w: &mut W) -> io::Result<()> {
         w.write_all(&(self.by_path.len() as u32).to_le_bytes())?;
-        for (path, ids) in self.by_path.iter() {
+        for (path, doc) in self.by_path.iter() {
             w.write_all(&(path.len() as u32).to_le_bytes())?;
             w.write_all(path.as_bytes())?;
-            w.write_all(&(ids.len() as u32).to_le_bytes())?;
-            for id in ids.iter() {
+            w.write_all(&(doc.by_page.len() as u32).to_le_bytes())?;
+            for (page, id) in doc.by_page.iter() {
+                w.write_all(&page.to_le_bytes())?;
                 w.write_all(&(id.len() as u32).to_le_bytes())?;
                 w.write_all(id.as_bytes())?;
             }
@@ -46,21 +61,24 @@ impl ImageCache {
             let mut path = vec![0; path_len as usize];
             r.read_exact(&mut path)?;
             r.read_exact(&mut buf)?;
-            let id_count = u32::from_le_bytes(buf);
-            let mut ids = Vec::with_capacity(id_count as usize);
-            for _ in 0..id_count {
+            let page_count = u32::from_le_bytes(buf);
+            let mut by_page = HashMap::with_capacity(page_count as usize);
+            for _ in 0..page_count {
+                r.read_exact(&mut buf)?;
+                let page = u32::from_le_bytes(buf);
                 r.read_exact(&mut buf)?;
                 let id_len = u32::from_le_bytes(buf);
                 let mut id = vec![0; id_len as usize];
                 r.read_exact(&mut id)?;
-                ids.push(
+                by_page.insert(
+                    page,
                     String::from_utf8(id)
                         .map_err(|_err| io::Error::new(io::ErrorKind::InvalidData, "not UTF-8"))?,
                 );
             }
             let path_str = String::from_utf8(path)
                 .map_err(|_err| io::Error::new(io::ErrorKind::InvalidData, "not UTF-8"))?;
-            by_path.insert(path_str, ids);
+            by_path.insert(path_str, ImageCacheDocument { by_page });
         }
         Ok(Self { by_path })
     }
@@ -77,30 +95,29 @@ fn find_first_useful_outline(outlines: &[Outline]) -> Option<&Outline> {
     find_first_useful_outline(&o.down)
 }
 
-fn process_lesson_pdf<P: AsRef<Path>>(
-    path: P,
-    index: &mut SearchIndex,
-    image_cache: &mut ImageCache,
-) {
-    eprintln!("Processing {}...", path.as_ref().display());
+fn build_search_index_from_document<P: AsRef<Path>>(
+    document_path: P,
+    image_cache: &RwLock<ImageCache>,
+) -> SearchIndex {
+    eprintln!("Processing {}...", document_path.as_ref().display());
 
-    let mut compressor = turbojpeg::Compressor::new().unwrap();
-    compressor.set_quality(50);
-    compressor.set_subsamp(turbojpeg::Subsamp::Sub2x1);
+    let mut encoder = jpegxl_rs::encoder_builder()
+        .lossless(true)
+        .speed(jpegxl_rs::encode::EncoderSpeed::Tortoise)
+        .build()
+        .unwrap();
 
-    let image_cache_doc = image_cache
-        .by_path
-        .entry(
-            path.as_ref()
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_owned(),
-        )
-        .or_default();
+    let document_path_str = document_path.as_ref().as_os_str().to_str().unwrap();
 
-    let doc = PdfDocument::open(path.as_ref().to_str().unwrap()).unwrap();
+    {
+        let mut c = image_cache.write().unwrap();
+        if !c.by_path.contains_key(document_path_str) {
+            c.by_path
+                .insert(document_path_str.to_owned(), ImageCacheDocument::new());
+        }
+    }
+
+    let doc = PdfDocument::open(document_path.as_ref().to_str().unwrap()).unwrap();
 
     // Ignore header and table of content by looking at the first outline that is not the table of
     // content, if there is one.
@@ -108,39 +125,11 @@ fn process_lesson_pdf<P: AsRef<Path>>(
     let first_useful_outline = find_first_useful_outline(&outlines);
     let content_start = first_useful_outline.map(|o| (o.page.unwrap(), o.y));
 
+    let mut search_index = SearchIndex::new();
     for (page_index, page) in doc.pages().unwrap().enumerate() {
         let page = page.unwrap();
 
-        // Encode image for the page or reuse existing one.
-        let image_id = if page_index >= image_cache_doc.len() {
-            // TODO: fix the `alpha` parameter not being a boolean
-            let pixmap = page
-                .to_pixmap(
-                    &Matrix::new_scale(2., 2.),
-                    &Colorspace::device_rgb(),
-                    0.,
-                    false,
-                )
-                .unwrap();
-            let encoded = compressor
-                .compress_to_vec(turbojpeg::Image {
-                    pixels: pixmap.samples(),
-                    width: pixmap.width() as usize,
-                    height: pixmap.height() as usize,
-                    pitch: (pixmap.width() * 3) as usize,
-                    format: turbojpeg::PixelFormat::RGB,
-                })
-                .unwrap();
-            let digest = blake3::hash(&encoded);
-            let id = base64::encode_config(digest.as_bytes(), base64::URL_SAFE_NO_PAD);
-            fs::write(format!("index/images/{}.jpg", id), encoded).unwrap();
-
-            assert!(image_cache_doc.len() == page_index);
-            image_cache_doc.push(id.clone());
-            id
-        } else {
-            image_cache_doc[page_index].clone()
-        };
+        const SCALE: f32 = 3.;
 
         // Scan the page for text.
         if let Some((start_page, _start_y)) = content_start {
@@ -149,6 +138,8 @@ fn process_lesson_pdf<P: AsRef<Path>>(
             }
         }
         let text_page = page.to_text_page(TextPageOptions::empty()).unwrap();
+        let image_index = search_index.image_ids.len() as u32;
+        let mut has_result = false;
         for b in text_page.blocks() {
             for l in b.lines() {
                 let bounds = l.bounds();
@@ -167,54 +158,116 @@ fn process_lesson_pdf<P: AsRef<Path>>(
                 if words.len() < 2 || (words[0] != "theoreme" && words[0] != "definition") {
                     continue;
                 }
-                let result_index = index.results.len();
-                index.results.push(SearchResult {
-                    image_index: index.image_ids.len() as u32,
-                    x: (bounds.x0 * 2.) as i16,
-                    y: (bounds.y0 * 2.) as i16,
-                    width: ((bounds.x1 - bounds.x0) * 2.) as u16,
-                    height: ((bounds.y1 - bounds.y0) * 2.) as u16,
+                let result_index = search_index.results.len();
+                search_index.results.push(SearchResult {
+                    image_index,
+                    x: (bounds.x0 * SCALE) as i16,
+                    y: (bounds.y0 * SCALE) as i16,
+                    width: ((bounds.x1 - bounds.x0) * SCALE) as u16,
+                    height: ((bounds.y1 - bounds.y0) * SCALE) as u16,
                 });
                 for w in words.iter() {
-                    index.words.entry(w.to_string()).or_default().push(Match {
-                        result_index: result_index as u32,
-                        score: 1. / words.len() as f32,
-                    });
+                    search_index
+                        .words
+                        .entry(w.to_string())
+                        .or_default()
+                        .push(Match {
+                            result_index: result_index as u32,
+                            score: 1. / words.len() as f32,
+                        });
                 }
+                has_result = true;
             }
         }
-        index.image_ids.push(image_id);
+        if !has_result {
+            continue;
+        }
+
+        // Encode image for the page or reuse existing one.
+        let image_id = {
+            let c = image_cache.read().unwrap();
+            let d = c.by_path.get(document_path_str).unwrap();
+            d.by_page.get(&(page_index as u32)).cloned()
+        }
+        .unwrap_or_else(|| {
+            eprintln!(
+                "Encoding page {} of {}...",
+                page_index,
+                document_path.as_ref().display()
+            );
+            // TODO: fix the `alpha` parameter not being a boolean
+            let pixmap = page
+                .to_pixmap(
+                    &Matrix::new_scale(SCALE, SCALE),
+                    &Colorspace::device_rgb(),
+                    0.,
+                    false,
+                )
+                .unwrap();
+            let encoded = encoder
+                .encode::<u8, u8>(pixmap.samples(), pixmap.width(), pixmap.height())
+                .unwrap();
+            let digest = blake3::hash(&encoded);
+            let id = base64::encode_config(digest.as_bytes(), base64::URL_SAFE_NO_PAD);
+            fs::write(format!("index/images/{}.jxl", id), &*encoded).unwrap();
+
+            let mut c = image_cache.write().unwrap();
+            let d = c.by_path.get_mut(document_path_str).unwrap();
+            d.by_page.insert(page_index as u32, id.clone());
+
+            id
+        });
+        search_index.image_ids.push(image_id.to_string());
     }
+    search_index
 }
 
 fn main() {
-    let mut image_cache = match File::open("index/image-cache.bin") {
+    let image_cache = match File::open("index/image-cache.bin") {
         Ok(ref mut f) => ImageCache::deserialize(f).unwrap(),
         Err(e) if e.kind() == io::ErrorKind::NotFound => ImageCache::new(),
         Err(e) => panic!("failed to read image cache: {}", e),
     };
+    let image_cache = RwLock::new(image_cache);
 
     fs::create_dir_all("index/images").unwrap();
-    let mut index = SearchIndex::new();
-    for entry in fs::read_dir("lessons").unwrap() {
-        let entry = entry.unwrap();
-        if entry.metadata().unwrap().is_file()
-            && entry
-                .path()
-                .extension()
-                .map(|e| e == "pdf")
-                .unwrap_or(false)
-        {
-            process_lesson_pdf(entry.path(), &mut index, &mut image_cache);
-        }
-    }
-    let mut file = OpenOptions::new()
+
+    let index = Mutex::new(SearchIndex::new());
+    fs::read_dir("lessons")
+        .unwrap()
+        .par_bridge()
+        .map(|e| e.unwrap())
+        .filter(|e| {
+            e.metadata().unwrap().is_file()
+                && e.path().extension().map(|e| e == "pdf").unwrap_or(false)
+        })
+        .map(|e| build_search_index_from_document(e.path(), &image_cache))
+        .for_each(|mut partial_index| {
+            // Merge partial index into global index.
+            let mut i = index.lock().unwrap();
+            let image_index_base = i.image_ids.len() as u32;
+            i.image_ids.extend_from_slice(&partial_index.image_ids);
+            for r in partial_index.results.iter_mut() {
+                r.image_index += image_index_base;
+            }
+            let result_index_base = i.results.len() as u32;
+            i.results.extend_from_slice(&partial_index.results);
+            for (word, mut partial_matches) in partial_index.words.into_iter() {
+                let matches = i.words.entry(word).or_default();
+                for m in partial_matches.iter_mut() {
+                    m.result_index += result_index_base;
+                }
+                matches.extend_from_slice(&partial_matches);
+            }
+        });
+
+    let mut index_file = OpenOptions::new()
         .create(true)
         .truncate(true)
         .write(true)
         .open("index/index.bin")
         .unwrap();
-    index.serialize(&mut file).unwrap();
+    index.lock().unwrap().serialize(&mut index_file).unwrap();
 
     let mut image_cache_file = OpenOptions::new()
         .create(true)
@@ -222,5 +275,9 @@ fn main() {
         .write(true)
         .open("index/image-cache.bin")
         .unwrap();
-    image_cache.serialize(&mut image_cache_file).unwrap();
+    image_cache
+        .read()
+        .unwrap()
+        .serialize(&mut image_cache_file)
+        .unwrap();
 }

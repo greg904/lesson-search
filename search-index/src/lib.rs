@@ -3,6 +3,7 @@ use std::{
     io::{self, Read, Write},
 };
 
+#[derive(Clone)]
 pub struct SearchResult {
     pub image_index: u32,
     pub x: i16,
@@ -11,6 +12,7 @@ pub struct SearchResult {
     pub height: u16,
 }
 
+#[derive(Clone)]
 pub struct Match {
     pub result_index: u32,
     pub score: f32,
