@@ -3,6 +3,8 @@ use std::{
     io::{self, Read, Write},
 };
 
+use rust_stemmers::{Algorithm, Stemmer};
+
 include!(concat!(env!("OUT_DIR"), "/synonyms.rs"));
 
 fn deserialize_u32<R: Read>(r: &mut R) -> io::Result<u32> {
@@ -213,14 +215,23 @@ impl SearchIndex {
 }
 
 pub fn normalize(s: &str) -> String {
-    let mut normalized = deunicode::deunicode(s)
-        .to_ascii_lowercase()
-        .split(|c: char| !c.is_ascii_alphanumeric())
+    let stemmer = Stemmer::create(Algorithm::French);
+    let mut normalized = s
+        .split(|c: char| !c.is_alphanumeric())
+        .map(|w| stemmer.stem(w).to_lowercase())
+        .map(|w| {
+            deunicode::deunicode(&w)
+                .split(|c: char| !c.is_ascii_alphanumeric())
+                .filter(|p| p.len() > 1)
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
         .filter(|w| !w.is_empty())
         .collect::<Vec<_>>()
         .join(" ");
     for (canonical, synonyms) in SYNONYMS.iter() {
         for s in synonyms.iter() {
+            // TODO: replace on word boundaries only
             normalized = normalized.replace(s, canonical);
         }
     }

@@ -1,4 +1,8 @@
-use std::{collections::{BTreeMap, HashMap}, env, fs::File};
+use std::{
+    collections::{BTreeMap, HashMap},
+    env,
+    fs::File,
+};
 
 use serde::Serialize;
 
@@ -73,10 +77,12 @@ fn main() {
                     score_b.partial_cmp(&score_a).unwrap()
                 });
 
-                pages.into_iter()
+                pages
+                    .into_iter()
                     .map(|(page_index, page_search)| {
                         let (result_indices, _score) = page_search;
-                        let rects = result_indices.into_iter()
+                        let rects = result_indices
+                            .into_iter()
                             .map(|r| {
                                 let result = &search_index.results[r as usize];
                                 Rect {
