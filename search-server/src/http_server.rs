@@ -64,7 +64,7 @@ fn serve_stream<F: FnMut(Request) -> Response>(
         for header in res.headers.iter() {
             write!(&mut res_bytes, "\r\n{}: {}", header.0, header.1)?;
         }
-        write!(&mut res_bytes, "\r\n\r\n");
+        write!(&mut res_bytes, "\r\n\r\n")?;
         res_bytes.extend_from_slice(&res.body);
         stream.write_all(&res_bytes)?;
         return Ok(());

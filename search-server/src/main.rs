@@ -72,10 +72,13 @@ fn main() {
                     height: result.height,
                 });
             }
-            let body = serde_json::to_string(&pages).unwrap().into();
+            let body: Vec<u8> = serde_json::to_string(&pages).unwrap().into();
             Response {
                 status_code: 200,
-                headers: Vec::new(),
+                headers: vec![
+                    ("Access-Control-Allow-Origin".to_string(), "http://localhost:8000".to_string()),
+                    ("Content-Length".to_string(), body.len().to_string()),
+                ],
                 body,
             }
         })
