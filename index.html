@@ -207,7 +207,11 @@ async function loop() {
 	let lastQuery
 	let query = queryInput.value
 	do {
-		await fetchAndUpdate(query)
+		try {
+			await fetchAndUpdate(query)
+		} catch (e) {
+			console.error(e)
+		}
 		lastQuery = query
 		query = queryInput.value
 	} while (query !== lastQuery)
