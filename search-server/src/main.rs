@@ -26,7 +26,8 @@ struct PageMatch {
 
 fn main() {
     let addr = env::var("BIND_ADDRESS").unwrap_or_else(|_| "127.0.0.1:3000".to_owned());
-    let search_index_path = env::var("INDEX_FILE").unwrap_or_else(|_| "db/search-index.bin".to_owned());
+    let search_index_path =
+        env::var("INDEX_FILE").unwrap_or_else(|_| "db/search-index.bin".to_owned());
     let cors_origin =
         env::var("CORS_ORIGIN").unwrap_or_else(|_| "http://localhost:8000".to_owned());
 

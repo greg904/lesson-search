@@ -67,7 +67,7 @@ impl DocumentRenderCache {
         let mut by_path = HashMap::with_capacity(doc_count as usize);
         for _ in 0..doc_count {
             let path = deserialize_string(r)?;
-            let page_count = deserialize_u32(r)?;
+            let page_count = deserialize_u16(r)?;
             let mut page_cache = HashMap::with_capacity(page_count as usize);
             for _ in 0..page_count {
                 let page = deserialize_u16(r)?;
@@ -97,13 +97,6 @@ fn build_search_index_from_document(
 ) -> SearchIndex {
     eprintln!("Processing {}...", document_path.display());
 
-    let mut encoder = jpegxl_rs::encoder_builder()
-        .lossless(true)
-        .speed(jpegxl_rs::encode::EncoderSpeed::Tortoise)
-        .decoding_speed(2)
-        .build()
-        .unwrap();
-
     let document_name = document_path.file_name().unwrap().to_str().unwrap();
 
     {
@@ -125,10 +118,10 @@ fn build_search_index_from_document(
     let mut search_index = SearchIndex::new();
     search_index.documents.push(document_name.to_owned());
 
+    const SCALE: f32 = 2.;
+
     for (page_nr, page) in doc.pages().unwrap().enumerate() {
         let page = page.unwrap();
-
-        const SCALE: f32 = 2.;
 
         // Scan the page for text.
         if let Some((start_page_nr, _start_y)) = content_start {
@@ -147,16 +140,29 @@ fn build_search_index_from_document(
                         continue;
                     }
                 }
+
                 let line: String = l.chars().flat_map(|c| c.char()).collect();
+                if line.is_empty() {
+                    continue;
+                }
+
                 let words: Vec<String> = deunicode::deunicode(&line)
                     .to_ascii_lowercase()
                     .split(|c: char| !c.is_ascii_alphanumeric())
-                    .filter(|w| w.len() > 2)
                     .map(|w| w.to_owned())
                     .collect();
-                if words.len() < 2 || (words[0] != "theoreme" && words[0] != "definition") {
+                if words.is_empty() {
                     continue;
                 }
+
+                let mut score = 1.;
+                // Heuristic for font size.
+                score *= (bounds.x1 - bounds.x0) * (bounds.y1 - bounds.y0) / (line.len() as f32);
+                // Boost certain patterns.
+                if words.len() >= 2 && (words[0] == "theoreme" || words[0] == "definition") {
+                    score *= 5.;
+                }
+
                 let result_index = search_index.results.len();
                 search_index.results.push(SearchResult {
                     page_index,
@@ -165,6 +171,7 @@ fn build_search_index_from_document(
                     width: ((bounds.x1 - bounds.x0) * SCALE) as u16,
                     height: ((bounds.y1 - bounds.y0) * SCALE) as u16,
                 });
+
                 for w in words.iter() {
                     search_index
                         .words
@@ -172,7 +179,7 @@ fn build_search_index_from_document(
                         .or_default()
                         .push(Match {
                             result_index: result_index as u32,
-                            score: 1. / words.len() as f32,
+                            score,
                         });
                 }
                 has_result = true;
@@ -182,20 +189,32 @@ fn build_search_index_from_document(
             continue;
         }
 
-        // Encode image for the page or reuse existing one.
-        let image_id = {
+        // Try to reuse existing render for the page.
+        let rendered_image_id = {
             let c = document_render_cache.read().unwrap();
-            let d = c.by_path.get(document_name).unwrap();
-            d.get(&(page_nr as u16)).cloned()
+            c.by_path
+                .get(document_name)
+                .and_then(|d| d.get(&(page_nr as u16)).cloned())
         }
-        .unwrap_or_else(|| {
-            eprintln!(
-                "Encoding page {} of {}...",
-                page_index,
-                document_path.display()
-            );
+        .unwrap_or_else(|| String::new());
+
+        search_index.pages.push(Page {
+            document_index: 0,
+            page_nr: page_nr as u16,
+            rendered_image_id,
+        });
+    }
+
+    // Render pages that weren't already cached.
+    search_index
+        .pages
+        .iter_mut()
+        .filter(|p| p.rendered_image_id.is_empty())
+        .map(|p| {
             // TODO: fix the `alpha` parameter not being a boolean
-            let pixmap = page
+            let pixmap = doc
+                .load_page(p.page_nr as i32)
+                .unwrap()
                 .to_pixmap(
                     &Matrix::new_scale(SCALE, SCALE),
                     &Colorspace::device_rgb(),
@@ -203,25 +222,40 @@ fn build_search_index_from_document(
                     false,
                 )
                 .unwrap();
-            let encoded = encoder
-                .encode::<u8, u8>(pixmap.samples(), pixmap.width(), pixmap.height())
+            (
+                p,
+                pixmap.width(),
+                pixmap.height(),
+                pixmap.samples().to_owned(),
+            )
+        })
+        .collect::<Vec<_>>()
+        .into_par_iter()
+        .for_each(|(p, width, height, samples)| {
+            eprintln!(
+                "Encoding page {} of {}...",
+                p.page_nr + 1,
+                document_path.display()
+            );
+            let mut encoder = jpegxl_rs::encoder_builder()
+                .lossless(true)
+                .speed(jpegxl_rs::encode::EncoderSpeed::Tortoise)
+                .decoding_speed(2)
+                .build()
                 .unwrap();
+            let encoded = encoder.encode::<u8, u8>(&samples, width, height).unwrap();
             let digest = blake3::hash(&encoded);
             let id = base64::encode_config(digest.as_bytes(), base64::URL_SAFE_NO_PAD);
             fs::write(rendered_pages_path.join(format!("{}.jxl", id)), &*encoded).unwrap();
 
-            let mut c = document_render_cache.write().unwrap();
-            let d = c.by_path.get_mut(document_name).unwrap();
-            d.insert(page_index as u16, id.clone());
+            {
+                let mut c = document_render_cache.write().unwrap();
+                let d = c.by_path.get_mut(document_name).unwrap();
+                d.insert(p.page_nr, id.clone());
+            }
 
-            id
+            p.rendered_image_id = id;
         });
-        search_index.pages.push(Page {
-            document_index: 0,
-            page_nr: page_nr as u16,
-            rendered_image_id: image_id,
-        });
-    }
 
     if search_index.pages.is_empty() {
         search_index.documents.clear();
