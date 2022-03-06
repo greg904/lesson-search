@@ -11,9 +11,14 @@ use mupdf::{pdf::PdfDocument, Colorspace, Matrix, Outline, TextPageOptions};
 use rayon::prelude::*;
 use search_index::{Match, Page, SearchIndex, SearchResult};
 
-type ImageId = String;
+#[derive(Clone)]
+struct CachedPage {
+    image_id: String,
+    width: u16,
+    height: u16,
+}
 
-type PageRenderCache = HashMap<u16, ImageId>;
+type PageRenderCache = HashMap<u16, CachedPage>;
 
 struct DocumentRenderCache {
     by_path: HashMap<String, PageRenderCache>,
@@ -53,10 +58,12 @@ impl DocumentRenderCache {
             w.write_all(&(path.len() as u32).to_le_bytes())?;
             w.write_all(path.as_bytes())?;
             w.write_all(&(pages.len() as u16).to_le_bytes())?;
-            for (page, id) in pages.iter() {
-                w.write_all(&page.to_le_bytes())?;
-                w.write_all(&(id.len() as u32).to_le_bytes())?;
-                w.write_all(id.as_bytes())?;
+            for (page_nr, page) in pages.iter() {
+                w.write_all(&page_nr.to_le_bytes())?;
+                w.write_all(&(page.image_id.len() as u32).to_le_bytes())?;
+                w.write_all(page.image_id.as_bytes())?;
+                w.write_all(&page.width.to_le_bytes())?;
+                w.write_all(&page.height.to_le_bytes())?;
             }
         }
         Ok(())
@@ -70,9 +77,15 @@ impl DocumentRenderCache {
             let page_count = deserialize_u16(r)?;
             let mut page_cache = HashMap::with_capacity(page_count as usize);
             for _ in 0..page_count {
-                let page = deserialize_u16(r)?;
-                let id = deserialize_string(r)?;
-                page_cache.insert(page, id);
+                let page_nr = deserialize_u16(r)?;
+                let image_id = deserialize_string(r)?;
+                let width = deserialize_u16(r)?;
+                let height = deserialize_u16(r)?;
+                page_cache.insert(page_nr, CachedPage {
+                    image_id,
+                    width,
+                    height,
+                });
             }
             by_path.insert(path, page_cache);
         }
@@ -190,18 +203,19 @@ fn build_search_index_from_document(
         }
 
         // Try to reuse existing render for the page.
-        let rendered_image_id = {
+        let cached_page = {
             let c = document_render_cache.read().unwrap();
             c.by_path
                 .get(document_name)
                 .and_then(|d| d.get(&(page_nr as u16)).cloned())
-        }
-        .unwrap_or_else(|| String::new());
+        };
 
         search_index.pages.push(Page {
             document_index: 0,
             page_nr: page_nr as u16,
-            rendered_image_id,
+            width: cached_page.as_ref().map(|p| p.width).unwrap_or(0),
+            height: cached_page.as_ref().map(|p| p.height).unwrap_or(0),
+            rendered_image_id: cached_page.map(|p| p.image_id).unwrap_or_else(|| String::new()),
         });
     }
 
@@ -251,10 +265,16 @@ fn build_search_index_from_document(
             {
                 let mut c = document_render_cache.write().unwrap();
                 let d = c.by_path.get_mut(document_name).unwrap();
-                d.insert(p.page_nr, id.clone());
+                d.insert(p.page_nr, CachedPage {
+                    image_id: id.clone(),
+                    width: width as u16,
+                    height: height as u16,
+                });
             }
 
             p.rendered_image_id = id;
+            p.width = width as u16;
+            p.height = height as u16;
         });
 
     if search_index.pages.is_empty() {

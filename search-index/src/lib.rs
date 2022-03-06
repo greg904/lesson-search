@@ -52,6 +52,8 @@ pub struct Page {
     pub document_index: u16,
     pub page_nr: u16,
     pub rendered_image_id: String,
+    pub width: u16,
+    pub height: u16,
 }
 
 impl Page {
@@ -59,11 +61,15 @@ impl Page {
         let document_index = deserialize_u16(r)?;
         let page_nr = deserialize_u16(r)?;
         let rendered_image_id = deserialize_string(r)?;
+        let width = deserialize_u16(r)?;
+        let height = deserialize_u16(r)?;
 
         Ok(Self {
             document_index,
             page_nr,
             rendered_image_id,
+            width,
+            height,
         })
     }
 }
@@ -176,6 +182,8 @@ impl SearchIndex {
             w.write_all(&page.page_nr.to_le_bytes())?;
             w.write_all(&(page.rendered_image_id.len() as u32).to_le_bytes())?;
             w.write_all(page.rendered_image_id.as_bytes())?;
+            w.write_all(&page.width.to_le_bytes())?;
+            w.write_all(&page.height.to_le_bytes())?;
         }
 
         w.write_all(&(self.results.len() as u32).to_le_bytes())?;
