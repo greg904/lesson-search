@@ -5,3 +5,6 @@ faf "formule accroissements finis"
 taf "theoreme accroissements finis"
 iaf "inegalite accroissements finis"
 fini finie
+projete projecteur projection
+df "dimension finie"
+cs "cauchy schwarz"

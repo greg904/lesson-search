@@ -52,7 +52,13 @@ fn main() {
             code.push(c);
         }
         code += "\", &[";
+        let mut first = true;
         for s in synonyms.iter().skip(1) {
+            if first {
+                first = false;
+            } else {
+                code += ", ";
+            }
             code += "\"";
             for c in s.escape_default() {
                 code.push(c);

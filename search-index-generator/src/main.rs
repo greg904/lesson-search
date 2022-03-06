@@ -177,7 +177,7 @@ fn build_search_index_from_document(
                 score += (font_size / 5.) / (1. + font_size / 5.);
                 // Boost certain patterns.
                 if words.len() >= 2 && (words[0] == "theoreme" || words[0] == "definition") {
-                    score += 1.;
+                    score += 0.8;
                 }
 
                 // Remove duplicate words to prevent counting them multiple times for a single line.
