@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fs::File};
+use std::{collections::BTreeMap, env, fs::File};
 
 use serde::Serialize;
 
@@ -25,10 +25,15 @@ struct PageMatch {
 }
 
 fn main() {
-    let mut search_index_file = File::open("index/index.bin").unwrap();
+    let addr = env::var("BIND_ADDRESS").unwrap_or_else(|_| "127.0.0.1:3000".to_owned());
+    let search_index_path = env::var("INDEX_FILE").unwrap_or_else(|_| "db/search-index.bin".to_owned());
+    let cors_origin =
+        env::var("CORS_ORIGIN").unwrap_or_else(|_| "http://localhost:8000".to_owned());
+
+    let mut search_index_file = File::open(search_index_path).unwrap();
     let search_index = SearchIndex::deserialize(&mut search_index_file).unwrap();
 
-    let server = HttpServer::bind("127.0.0.1:3000").unwrap();
+    let server = HttpServer::bind(addr).unwrap();
     server
         .serve(|req| {
             let query = urlencoding::decode(&req.url[1..]).unwrap();
@@ -81,15 +86,16 @@ fn main() {
                 });
             }
             let body: Vec<u8> = serde_json::to_string(&pages).unwrap().into();
+            let mut headers = vec![("Content-Length".to_string(), body.len().to_string())];
+            if !cors_origin.is_empty() {
+                headers.push((
+                    "Access-Control-Allow-Origin".to_owned(),
+                    cors_origin.clone(),
+                ));
+            }
             Response {
                 status_code: 200,
-                headers: vec![
-                    (
-                        "Access-Control-Allow-Origin".to_string(),
-                        "http://localhost:8000".to_string(),
-                    ),
-                    ("Content-Length".to_string(), body.len().to_string()),
-                ],
+                headers,
                 body,
             }
         })
