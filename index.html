@@ -122,7 +122,7 @@ async function fetchAndUpdate (query) {
 
 		const openLink = document.createElement('a')
 		openLink.classList.add('open-link')
-		openLink.href = 'pdfjs/web/viewer.html?file=' + documentEndpoint + page.document + '#page=' + page.pageNr
+		openLink.href = 'pdfjs/web/viewer.html?file=' + documentEndpoint + page.document + '#page=' + (page.pageNr + 1)
 		openLink.textContent = 'Ouvrir PDF'
 		openLink.setAttribute('data-fancybox', '')
 		openLink.setAttribute('data-type', 'pdf')
