@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width">
 <title>Recherche de cours</title>
 <style>
+html, body {
+	margin: 0;
+	padding: 0;
+}
+
 body {
 	background: #DADADA;
 	font-family: sans-serif;
@@ -105,6 +110,9 @@ async function fetchAndUpdate (query) {
 		const image = document.createElement('img')
 		image.src = renderedPageEndpoint + page.renderedImageId + '.jxl'
 		image.setAttribute('draggable', 'false')
+		image.setAttribute('loading', 'lazy')
+		image.width = page.width
+		image.height = page.height
 		if (cropStart !== 0) {
 			image.style.marginTop = -cropStart + 'px'
 		}
@@ -122,7 +130,7 @@ async function fetchAndUpdate (query) {
 
 		const openLink = document.createElement('a')
 		openLink.classList.add('open-link')
-		openLink.href = 'pdfjs/web/viewer.html?file=' + documentEndpoint + page.document + '#page=' + (page.pageNr + 1)
+		openLink.href = 'pdfjs/web/viewer.html?file=' + documentEndpoint + page.documentName + '#page=' + (page.pageNr + 1)
 		openLink.textContent = 'Ouvrir PDF'
 		openLink.setAttribute('data-fancybox', '')
 		openLink.setAttribute('data-type', 'pdf')
