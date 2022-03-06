@@ -41,7 +41,6 @@ fn main() {
             let words: Vec<String> = deunicode::deunicode(&query)
                 .to_ascii_lowercase()
                 .split(|c: char| !c.is_ascii_alphanumeric())
-                .filter(|w| w.len() > 2)
                 .map(|w| w.to_owned())
                 .collect();
             let mut scores: BTreeMap<u32, f32> = BTreeMap::new();
@@ -67,7 +66,7 @@ fn main() {
                     None => {
                         let i = pages.len();
                         // Limit page count.
-                        if i > 5 {
+                        if i > 20 {
                             break;
                         }
                         pages.push(PageMatch {
