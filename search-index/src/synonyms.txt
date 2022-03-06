@@ -1,4 +1,4 @@
-sev "sous espace vectoriel"
+sev "sous espace vectoriel" "sous espace"
 bon "base orthonormale"
 tmc "theoreme moment cinetique"
 faf "formule accroissements finis"
@@ -8,3 +8,4 @@ fini finie
 projete projecteur projection
 df "dimension finie"
 cs "cauchy schwarz"
+ps "produit scalaire"

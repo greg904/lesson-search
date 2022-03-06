@@ -1,9 +1,9 @@
 use std::env;
 use std::fs;
-use std::io::BufReader;
-use std::io::BufRead;
-use std::path::Path;
 use std::fs::File;
+use std::io::BufRead;
+use std::io::BufReader;
+use std::path::Path;
 
 fn parse_words(line: &str) -> Vec<String> {
     let mut words = Vec::new();
@@ -70,10 +70,7 @@ fn main() {
 
     code += "];\n\n";
 
-    fs::write(
-        out_dir_path.join("synonyms.rs"),
-        code,
-    ).unwrap();
+    fs::write(out_dir_path.join("synonyms.rs"), code).unwrap();
 
     println!("cargo:rerun-if-changed=src/synonyms.txt");
 }

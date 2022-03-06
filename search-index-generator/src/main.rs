@@ -81,11 +81,14 @@ impl DocumentRenderCache {
                 let image_id = deserialize_string(r)?;
                 let width = deserialize_u16(r)?;
                 let height = deserialize_u16(r)?;
-                page_cache.insert(page_nr, CachedPage {
-                    image_id,
-                    width,
-                    height,
-                });
+                page_cache.insert(
+                    page_nr,
+                    CachedPage {
+                        image_id,
+                        width,
+                        height,
+                    },
+                );
             }
             by_path.insert(path, page_cache);
         }
@@ -154,29 +157,26 @@ fn build_search_index_from_document(
                     }
                 }
 
-                let line: String = l.chars()
-                    .flat_map(|c| c.char())
-                    .collect();
+                let line: String = l.chars().flat_map(|c| c.char()).collect();
 
                 let normalized = search_index::normalize(&line);
                 if normalized.is_empty() {
                     continue;
                 }
 
-                let mut words: Vec<String> = normalized
-                    .split(' ')
-                    .map(|w| w.to_owned())
-                    .collect();
+                let mut words: Vec<String> = normalized.split(' ').map(|w| w.to_owned()).collect();
                 if words.is_empty() {
                     continue;
                 }
 
                 let mut score = 1.;
                 // Heuristic for font size.
-                let font_size = ((bounds.x1 - bounds.x0) * (bounds.y1 - bounds.y0) / (line.len() as f32)).sqrt();
+                let font_size = ((bounds.x1 - bounds.x0) * (bounds.y1 - bounds.y0)
+                    / (line.len() as f32))
+                    .sqrt();
                 score += (font_size / 5.) / (1. + font_size / 5.);
-                // Boost certain patterns.
-                if words.len() >= 2 && (words[0] == "theoreme" || words[0] == "definition") {
+                // Boost certain patterns. Note that the words are stemmed.
+                if words.len() >= 2 && (words[0] == "theorem" || words[0] == "definit") {
                     score += 0.8;
                 }
 
@@ -223,7 +223,9 @@ fn build_search_index_from_document(
             page_nr: page_nr as u16,
             width: cached_page.as_ref().map(|p| p.width).unwrap_or(0),
             height: cached_page.as_ref().map(|p| p.height).unwrap_or(0),
-            rendered_image_id: cached_page.map(|p| p.image_id).unwrap_or_else(|| String::new()),
+            rendered_image_id: cached_page
+                .map(|p| p.image_id)
+                .unwrap_or_else(|| String::new()),
         });
     }
 
@@ -273,11 +275,14 @@ fn build_search_index_from_document(
             {
                 let mut c = document_render_cache.write().unwrap();
                 let d = c.by_path.get_mut(document_name).unwrap();
-                d.insert(p.page_nr, CachedPage {
-                    image_id: id.clone(),
-                    width: width as u16,
-                    height: height as u16,
-                });
+                d.insert(
+                    p.page_nr,
+                    CachedPage {
+                        image_id: id.clone(),
+                        width: width as u16,
+                        height: height as u16,
+                    },
+                );
             }
 
             p.rendered_image_id = id;
