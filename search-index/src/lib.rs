@@ -216,6 +216,7 @@ pub fn normalize(s: &str) -> String {
     let mut normalized = deunicode::deunicode(s)
         .to_ascii_lowercase()
         .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|w| !w.is_empty())
         .collect::<Vec<_>>()
         .join(" ");
     for (canonical, synonyms) in SYNONYMS.iter() {

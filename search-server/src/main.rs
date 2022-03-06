@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, env, fs::File};
+use std::{collections::{BTreeMap, HashMap}, env, fs::File};
 
 use serde::Serialize;
 
@@ -40,54 +40,67 @@ fn main() {
     server
         .serve(|req| {
             let query = urlencoding::decode(&req.url[1..]).unwrap();
-            let words: Vec<String> = search_index::normalize(&query)
-                .split(' ')
-                .map(|w| w.to_owned())
-                .collect();
-            let mut scores: BTreeMap<u32, f32> = BTreeMap::new();
-            for w in words.iter() {
-                if let Some(matches) = search_index.words.get(w) {
-                    for m in matches {
-                        *scores.entry(m.result_index).or_default() += m.score;
+            let normalized = search_index::normalize(&query);
+            let pages = if normalized.is_empty() {
+                Vec::new()
+            } else {
+                let words: Vec<String> = search_index::normalize(&query)
+                    .split(' ')
+                    .map(|w| w.to_owned())
+                    .collect();
+
+                let mut pages: BTreeMap<u32, (Vec<u32>, HashMap<String, f32>)> = BTreeMap::new();
+                for w in words.iter() {
+                    if let Some(matches) = search_index.words.get(w) {
+                        for m in matches {
+                            let result = &search_index.results[m.result_index as usize];
+                            let (results, max_scores) = pages.entry(result.page_index).or_default();
+                            // Limit the amount of rect per page.
+                            if results.len() >= 20 {
+                                continue;
+                            }
+                            results.push(m.result_index);
+                            let max_score = max_scores.entry(w.to_owned()).or_default();
+                            *max_score = max_score.max(m.score);
+                        }
                     }
                 }
-            }
-            let mut sorted: Vec<_> = scores.into_iter().collect();
-            sorted.sort_by(|(_, s_a), (_, s_b)| s_b.partial_cmp(s_a).unwrap());
-            let mut pages: Vec<Page> = Vec::new();
-            for (r, _) in sorted.iter() {
-                let result = &search_index.results[*r as usize];
-                let page = &search_index.pages[result.page_index as usize];
-                let document_name = &search_index.documents[page.document_index as usize];
-                let page_index = match pages
-                    .iter()
-                    .position(|p| p.rendered_image_id == page.rendered_image_id)
-                {
-                    Some(i) => i,
-                    None => {
-                        let i = pages.len();
-                        // Limit page count.
-                        if i > 20 {
-                            break;
-                        }
-                        pages.push(Page {
+
+                let mut pages: Vec<_> = pages.into_iter().collect();
+                pages.sort_by(|(_, page_a), (_, page_b)| {
+                    let score_a: f32 = page_a.1.values().sum();
+                    let score_b: f32 = page_b.1.values().sum();
+                    score_b.partial_cmp(&score_a).unwrap()
+                });
+
+                pages.into_iter()
+                    .map(|(page_index, page_search)| {
+                        let (result_indices, _score) = page_search;
+                        let rects = result_indices.into_iter()
+                            .map(|r| {
+                                let result = &search_index.results[r as usize];
+                                Rect {
+                                    x: result.x,
+                                    y: result.y,
+                                    width: result.width,
+                                    height: result.height,
+                                }
+                            })
+                            .collect();
+                        let page = &search_index.pages[page_index as usize];
+                        let document_name = &search_index.documents[page.document_index as usize];
+                        Page {
                             document_name: document_name.to_owned(),
                             page_nr: page.page_nr,
                             rendered_image_id: page.rendered_image_id.clone(),
                             width: page.width,
                             height: page.height,
-                            rects: Vec::new(),
-                        });
-                        i
-                    }
-                };
-                pages[page_index].rects.push(Rect {
-                    x: result.x,
-                    y: result.y,
-                    width: result.width,
-                    height: result.height,
-                });
-            }
+                            rects,
+                        }
+                    })
+                    .take(10)
+                    .collect()
+            };
             let body: Vec<u8> = serde_json::to_string(&pages).unwrap().into();
             let mut headers = vec![("Content-Length".to_string(), body.len().to_string())];
             if !cors_origin.is_empty() {
