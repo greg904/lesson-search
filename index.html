@@ -31,12 +31,6 @@ body {
 	text-align: center;
 }
 
-@media (min-width: 480px) {
-	body {
-		text-align: left;
-	}
-}
-
 #header {
 	/* Center horizontally. */
 	max-width: 1120px;
@@ -107,21 +101,31 @@ body {
 	cursor: pointer;
 }
 
+@media (min-width: 480px) {
+	body {
+		text-align: left;
+	}
+
+	#query {
+		margin: 0;
+	}
+}
+
 @media (prefers-color-scheme: dark) {
-  body {
-    background-color: #000;
-    color: #fff;
-  }
+	body {
+		background-color: #000;
+		color: #fff;
+	}
 
-  #query {
-    background-color: #232425;
-    border-color: #404040;
-    color: #fff;
-  }
+	#query {
+		background-color: #232425;
+		border-color: #404040;
+		color: #fff;
+	}
 
-  #query:focus {
-    border-color: #008cfd;
-  }
+	#query:focus {
+		border-color: #008cfd;
+	}
 }
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@4.0/dist/fancybox.css" />
