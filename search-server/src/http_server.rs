@@ -42,10 +42,10 @@ fn serve_stream<F: FnMut(Request) -> Response>(
         };
         let req = Request {
             method: str::from_utf8(&buf[..first_space])
-                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, "invalid UTF-8"))?
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid UTF-8"))?
                 .to_owned(),
             url: str::from_utf8(&buf[(first_space + 1)..second_space])
-                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, "invalid UTF-8"))?
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid UTF-8"))?
                 .to_owned(),
             // TODO: parse headers
             headers: Vec::new(),
@@ -57,14 +57,14 @@ fn serve_stream<F: FnMut(Request) -> Response>(
             _ => "Unknown",
         };
         write!(
-            &mut res_bytes,
+            res_bytes,
             "HTTP/1.1 {} {}",
             res.status_code, human_code
         )?;
         for header in res.headers.iter() {
-            write!(&mut res_bytes, "\r\n{}: {}", header.0, header.1)?;
+            write!(res_bytes, "\r\n{}: {}", header.0, header.1)?;
         }
-        write!(&mut res_bytes, "\r\n\r\n")?;
+        write!(res_bytes, "\r\n\r\n")?;
         res_bytes.extend_from_slice(&res.body);
         stream.write_all(&res_bytes)?;
         return Ok(());

@@ -1,6 +1,6 @@
 [workspace]
 members = [
 	"search-index",
-	"index-generator",
+	"search-index-generator",
 	"search-server",
 ]
