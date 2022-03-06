@@ -70,7 +70,7 @@ body {
 const isDevelopment = location.origin === 'http://localhost:8000'
 const queryEndpoint = isDevelopment ? 'http://localhost:3000/' : 'https://mp1.mpsi1.fr/cours/api/'
 const renderedPageEndpoint = isDevelopment ? '/db/rendered-pages/' : 'https://mp1.mpsi1.fr/cours/pages/'
-const documentEndpoint = isDevelopment ? '/' : 'https://mp1.mpsi1.fr/cours/'
+const documentEndpoint = isDevelopment ? '/lessons/' : 'https://mp1.mpsi1.fr/cours/lessons/'
 const pdfJsRoot = isDevelopment ? '/pdfjs/' : 'https://mp1.mpsi1.fr/cours/pdfjs/'
 
 const queryInput = document.getElementById('query')
