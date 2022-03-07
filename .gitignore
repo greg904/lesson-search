@@ -1,4 +1,5 @@
 /target
 /db
+/db-test
 /pdfjs
 /lessons/*.pdf

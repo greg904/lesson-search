@@ -8,7 +8,7 @@ use std::{
 
 use mupdf::{pdf::PdfDocument, Colorspace, Matrix, Outline, TextPageOptions};
 use rayon::prelude::*;
-use search_index::{Match, Page, SearchIndex, SearchResult};
+use search_index::index::{Match, Page, SearchIndex, SearchResult};
 
 mod page_render_cache;
 
@@ -77,12 +77,7 @@ fn build_search_index_from_document(
 
                 let line: String = l.chars().flat_map(|c| c.char()).collect();
 
-                let normalized = search_index::normalize(&line);
-                if normalized.is_empty() {
-                    continue;
-                }
-
-                let mut words: Vec<String> = normalized.split(' ').map(|w| w.to_owned()).collect();
+                let mut words = search_index::normalize::normalize_and_extract_words(&line);
                 if words.is_empty() {
                     continue;
                 }
@@ -226,25 +221,20 @@ fn build_search_index_from_document(
     search_index
 }
 
-fn main() {
-    let lessons_dir: PathBuf = env::var_os("LESSONS_DIR")
-        .unwrap_or_else(|| "lessons".into())
-        .into();
-    let out_dir: PathBuf = env::var_os("OUT_DIR").unwrap_or_else(|| "db".into()).into();
-
-    fs::create_dir_all(&out_dir).unwrap();
+pub(crate) fn build_search_index(lessons_dir: &Path, out_dir: &Path) -> io::Result<()> {
+    fs::create_dir_all(&out_dir)?;
 
     let cache = match File::open(out_dir.join("document-render-cache.bin")) {
-        Ok(ref mut f) => page_render_cache::DocumentMap::deserialize(f).unwrap(),
+        Ok(ref mut f) => page_render_cache::DocumentMap::deserialize(f)?,
         Err(e) if e.kind() == io::ErrorKind::NotFound => page_render_cache::DocumentMap::new(),
-        Err(e) => panic!("failed to read page render cache: {}", e),
+        Err(e) => return Err(e),
     };
     let cache = RwLock::new(cache);
 
     let rendered_pages_path = out_dir.join("rendered-pages");
     if let Err(e) = fs::create_dir(&rendered_pages_path) {
         if e.kind() != io::ErrorKind::AlreadyExists {
-            panic!("failed to create rendered-pages directory");
+            return Err(e);
         }
     }
 
@@ -290,19 +280,82 @@ fn main() {
         .create(true)
         .truncate(true)
         .write(true)
-        .open(out_dir.join("search-index.bin"))
-        .unwrap();
+        .open(out_dir.join("search-index.bin"))?;
     search_index
         .lock()
         .unwrap()
-        .serialize(&mut search_index_file)
-        .unwrap();
+        .serialize(&mut search_index_file)?;
 
     let mut cache_file = OpenOptions::new()
         .create(true)
         .truncate(true)
         .write(true)
-        .open(out_dir.join("document-render-cache.bin"))
-        .unwrap();
-    cache.read().unwrap().serialize(&mut cache_file).unwrap();
+        .open(out_dir.join("document-render-cache.bin"))?;
+    cache.read().unwrap().serialize(&mut cache_file)?;
+
+    Ok(())
+}
+
+fn main() -> io::Result<()> {
+    let lessons_dir: PathBuf = env::var_os("LESSONS_DIR")
+        .unwrap_or_else(|| "lessons".into())
+        .into();
+    let out_dir: PathBuf = env::var_os("OUT_DIR").unwrap_or_else(|| "db".into()).into();
+    build_search_index(&lessons_dir, &out_dir)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{path::Path, fs::File};
+
+    use search_index::{index::SearchIndex, search::search};
+
+    use super::build_search_index;
+
+    #[test]
+    fn good_results() {
+        build_search_index(Path::new("../lessons"), Path::new("../db-test")).unwrap();
+        let search_index = SearchIndex::deserialize(&mut File::open("../db-test/search-index.bin").unwrap()).unwrap();
+
+        let cs_results = search(&search_index, "cs");
+        assert!(!cs_results.is_empty());
+        assert_eq!(cs_results[0].document_digest, "23_rev_Espaces_prehilbertiens.pdf");
+        assert_eq!(cs_results[0].number, 4);
+
+        let orthogonal_supplementaire_results = search(&search_index, "orthogonal supplémentaire");
+        assert!(!orthogonal_supplementaire_results.is_empty());
+        assert_eq!(orthogonal_supplementaire_results[0].document_digest, "23_rev_Espaces_prehilbertiens.pdf");
+        assert_eq!(orthogonal_supplementaire_results[0].number, 16);
+
+        let proj_results = search(&search_index, "Expression du projeté en base orthonormale");
+        assert!(!proj_results.is_empty());
+        assert_eq!(proj_results[0].document_digest, "23_rev_Espaces_prehilbertiens.pdf");
+        assert_eq!(proj_results[0].number, 20);
+
+        let dist_results = search(&search_index, "Distance à un sous­espace de dimension finie.");
+        assert!(!dist_results.is_empty());
+        assert_eq!(dist_results[0].document_digest, "23_rev_Espaces_prehilbertiens.pdf");
+        assert_eq!(dist_results[0].number, 23);
+
+        let total_series_results = search(&search_index, "Caractérisation des suites totales par des projecteurs orthogonaux.");
+        assert!(!total_series_results.is_empty());
+        assert_eq!(total_series_results[0].document_digest, "24_Espaces_prehilbertiens_suite.pdf");
+        assert_eq!(total_series_results[0].number, 2);
+
+        let endom_sym_results = search(&search_index, "Matrice en base orthonormale d’un endomorphisme symétrique");
+        assert!(!endom_sym_results.is_empty());
+        assert_eq!(endom_sym_results[0].document_digest, "24_Espaces_prehilbertiens_suite.pdf");
+        assert_eq!(endom_sym_results[0].number, 9);
+
+        let proj_ortho_results = search(&search_index, "Les projections orthogonales sont les projections symétriques");
+        assert!(!proj_ortho_results.is_empty());
+        assert_eq!(proj_ortho_results[0].document_digest, "24_Espaces_prehilbertiens_suite.pdf");
+        assert_eq!(proj_ortho_results[0].number, 9);
+
+
+        let sp_theorem_results = search(&search_index, "Caractérisation des suites totales par des projecteurs orthogonaux.");
+        assert!(!sp_theorem_results.is_empty());
+        assert_eq!(sp_theorem_results[0].document_digest, "24_Espaces_prehilbertiens_suite.pdf");
+        assert_eq!(sp_theorem_results[0].number, 10);
+    }
 }
