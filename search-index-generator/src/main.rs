@@ -52,7 +52,7 @@ fn build_search_index_from_document(
     let mut search_index = SearchIndex::new();
     search_index.documents.push(document_name.to_owned());
 
-    const SCALE: f32 = 2.;
+    const SCALE: f32 = 1.8;
 
     for (page_nr, page) in doc.pages().unwrap().enumerate() {
         let page = page.unwrap();
@@ -184,17 +184,16 @@ fn build_search_index_from_document(
                 p.page_nr + 1,
                 document_path.display()
             );
-            let mut encoder = jpegxl_rs::encoder_builder()
-                .lossless(true)
-                .speed(jpegxl_rs::encode::EncoderSpeed::Tortoise)
-                .decoding_speed(2)
-                .build()
-                .unwrap();
-            let encoded = encoder.encode::<u8, u8>(&samples, width, height).unwrap();
+            let pixels = libavif::RgbPixels::new(width, height, &samples).unwrap();
+            let image = pixels.to_image(libavif::YuvFormat::Yuv444);
+            let mut encoder = libavif::Encoder::new();
+            encoder.set_quantizer(40);
+            encoder.set_speed(0);
+            let encoded = &*encoder.encode(&image).unwrap();
             let digest = blake3::hash(&encoded);
             let digest = base64::encode_config(digest.as_bytes(), base64::URL_SAFE_NO_PAD);
             fs::write(
-                rendered_pages_path.join(format!("{}.jxl", digest)),
+                rendered_pages_path.join(format!("{}.avif", digest)),
                 &*encoded,
             )
             .unwrap();

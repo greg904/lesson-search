@@ -481,6 +481,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
+name = "libaom-sys"
+version = "0.11.0"
+source = "git+https://github.com/njaard/libavif-rs.git#bb871000bf68ad72bd162f3d8c464f1dd05404c2"
+dependencies = [
+ "cmake",
+]
+
+[[package]]
+name = "libavif"
+version = "0.9.0"
+source = "git+https://github.com/njaard/libavif-rs.git#bb871000bf68ad72bd162f3d8c464f1dd05404c2"
+dependencies = [
+ "libavif-sys",
+]
+
+[[package]]
+name = "libavif-sys"
+version = "0.12.1"
+source = "git+https://github.com/njaard/libavif-rs.git#bb871000bf68ad72bd162f3d8c464f1dd05404c2"
+dependencies = [
+ "cmake",
+ "libaom-sys",
+ "libc",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.119"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -792,6 +818,7 @@ dependencies = [
  "base64",
  "blake3",
  "jpegxl-rs",
+ "libavif",
  "mupdf",
  "rayon",
  "search-index",

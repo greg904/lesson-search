@@ -8,6 +8,12 @@ base64 = "0.13.0"
 rayon = "1.5"
 search-index = { path = "../search-index" }
 
+[dependencies.libavif]
+# TODO: Switch to crates.io when the fix to build libaom-sys on Linux lands.
+git = "https://github.com/njaard/libavif-rs.git"
+default-features = false
+features = ["codec-aom"]
+
 [dependencies.jpegxl-rs]
 version = "0.6.1"
 default-features = false
