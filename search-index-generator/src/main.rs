@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     env,
     fs::{self, File, OpenOptions},
     io,
@@ -8,11 +7,8 @@ use std::{
 };
 
 use mupdf::{pdf::PdfDocument, Colorspace, Matrix, Outline, TextPageOptions};
-use page_render_cache::DocumentRenderCache;
 use rayon::prelude::*;
 use search_index::{Match, Page, SearchIndex, SearchResult};
-
-use crate::page_render_cache::{PageRenderCache, CachedPage};
 
 mod page_render_cache;
 
@@ -29,17 +25,19 @@ fn find_first_useful_outline(outlines: &[Outline]) -> Option<&Outline> {
 fn build_search_index_from_document(
     document_path: &Path,
     rendered_pages_path: &Path,
-    document_render_cache: &RwLock<DocumentRenderCache>,
+    cache: &RwLock<page_render_cache::DocumentMap>,
 ) -> SearchIndex {
     eprintln!("Processing {}...", document_path.display());
 
     let document_name = document_path.file_name().unwrap().to_str().unwrap();
 
     {
-        let mut c = document_render_cache.write().unwrap();
-        if !c.by_path.contains_key(document_name) {
-            c.by_path
-                .insert(document_name.to_owned(), PageRenderCache::new());
+        let mut c = cache.write().unwrap();
+        if !c.0.contains_key(document_name) {
+            c.0.insert(
+                document_name.to_owned(),
+                page_render_cache::PageImageMap::new(),
+            );
         }
     }
 
@@ -137,10 +135,12 @@ fn build_search_index_from_document(
 
         // Try to reuse existing render for the page.
         let cached_page = {
-            let c = document_render_cache.read().unwrap();
-            c.by_path
+            cache
+                .read()
+                .unwrap()
+                .0
                 .get(document_name)
-                .and_then(|d| d.get(&(page_nr as u16)).cloned())
+                .and_then(|d| d.0.get(&(page_nr as u16)).cloned())
         };
 
         search_index.pages.push(Page {
@@ -149,7 +149,7 @@ fn build_search_index_from_document(
             width: cached_page.as_ref().map(|p| p.width).unwrap_or(0),
             height: cached_page.as_ref().map(|p| p.height).unwrap_or(0),
             rendered_image_id: cached_page
-                .map(|p| p.image_id)
+                .map(|p| p.digest)
                 .unwrap_or_else(|| String::new()),
         });
     }
@@ -194,23 +194,27 @@ fn build_search_index_from_document(
                 .unwrap();
             let encoded = encoder.encode::<u8, u8>(&samples, width, height).unwrap();
             let digest = blake3::hash(&encoded);
-            let id = base64::encode_config(digest.as_bytes(), base64::URL_SAFE_NO_PAD);
-            fs::write(rendered_pages_path.join(format!("{}.jxl", id)), &*encoded).unwrap();
+            let digest = base64::encode_config(digest.as_bytes(), base64::URL_SAFE_NO_PAD);
+            fs::write(
+                rendered_pages_path.join(format!("{}.jxl", digest)),
+                &*encoded,
+            )
+            .unwrap();
 
             {
-                let mut c = document_render_cache.write().unwrap();
-                let d = c.by_path.get_mut(document_name).unwrap();
-                d.insert(
+                let mut c = cache.write().unwrap();
+                let d = c.0.get_mut(document_name).unwrap();
+                d.0.insert(
                     p.page_nr,
-                    CachedPage {
-                        image_id: id.clone(),
+                    page_render_cache::Image {
+                        digest: digest.clone(),
                         width: width as u16,
                         height: height as u16,
                     },
                 );
             }
 
-            p.rendered_image_id = id;
+            p.rendered_image_id = digest;
             p.width = width as u16;
             p.height = height as u16;
         });
@@ -230,12 +234,12 @@ fn main() {
 
     fs::create_dir_all(&out_dir).unwrap();
 
-    let document_render_cache = match File::open(out_dir.join("document-render-cache.bin")) {
-        Ok(ref mut f) => DocumentRenderCache::deserialize(f).unwrap(),
-        Err(e) if e.kind() == io::ErrorKind::NotFound => DocumentRenderCache::new(),
+    let cache = match File::open(out_dir.join("document-render-cache.bin")) {
+        Ok(ref mut f) => page_render_cache::DocumentMap::deserialize(f).unwrap(),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => page_render_cache::DocumentMap::new(),
         Err(e) => panic!("failed to read page render cache: {}", e),
     };
-    let document_render_cache = RwLock::new(document_render_cache);
+    let cache = RwLock::new(cache);
 
     let rendered_pages_path = out_dir.join("rendered-pages");
     if let Err(e) = fs::create_dir(&rendered_pages_path) {
@@ -253,13 +257,7 @@ fn main() {
             e.metadata().unwrap().is_file()
                 && e.path().extension().map(|e| e == "pdf").unwrap_or(false)
         })
-        .map(|e| {
-            build_search_index_from_document(
-                &e.path(),
-                &rendered_pages_path,
-                &document_render_cache,
-            )
-        })
+        .map(|e| build_search_index_from_document(&e.path(), &rendered_pages_path, &cache))
         .for_each(|mut partial_index| {
             // Merge partial index into global index.
             let mut i = search_index.lock().unwrap();
@@ -300,15 +298,11 @@ fn main() {
         .serialize(&mut search_index_file)
         .unwrap();
 
-    let mut document_render_cache_file = OpenOptions::new()
+    let mut cache_file = OpenOptions::new()
         .create(true)
         .truncate(true)
         .write(true)
         .open(out_dir.join("document-render-cache.bin"))
         .unwrap();
-    document_render_cache
-        .read()
-        .unwrap()
-        .serialize(&mut document_render_cache_file)
-        .unwrap();
+    cache.read().unwrap().serialize(&mut cache_file).unwrap();
 }
