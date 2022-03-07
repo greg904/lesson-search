@@ -41,7 +41,9 @@ pub fn search(search_index: &SearchIndex, query: &str) -> Vec<MatchPage> {
                 if results.len() >= 20 {
                     continue;
                 }
-                results.push(m.result_index);
+                if !results.contains(&m.result_index) {
+                    results.push(m.result_index);
+                }
                 let max_score = max_scores.entry(w.to_owned()).or_default();
                 *max_score = max_score.max(m.score);
             }
