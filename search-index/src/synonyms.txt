@@ -8,3 +8,4 @@ projet projecteur project
 df "dimens fin"
 cs "cauchy schwarz"
 ps "produit scalaire"
+mat matric matriciel

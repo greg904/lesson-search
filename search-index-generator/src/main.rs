@@ -87,7 +87,9 @@ fn build_search_index_from_document(
                 let font_size = ((bounds.x1 - bounds.x0) * (bounds.y1 - bounds.y0)
                     / (line.len() as f32))
                     .sqrt();
-                score += (font_size / 5.) / (1. + font_size / 5.);
+                const AVG_FONT_SIZE: f32 = 10.;
+                const FONT_SIZE_STD: f32 = 2.;
+                let mut importance = 1. / (1. + (-(font_size - AVG_FONT_SIZE) / FONT_SIZE_STD).clamp(-10., 10.).exp());
                 // Boost certain patterns. Note that the words are stemmed.
                 if words.len() >= 2
                     && (words[0] == "theorem"
@@ -95,8 +97,9 @@ fn build_search_index_from_document(
                         || words[0] == "propriet"
                         || words[0] == "method")
                 {
-                    score += 0.8;
+                    importance = importance.max(0.95);
                 }
+                score += importance;
 
                 // Remove duplicate words to prevent counting them multiple times for a single line.
                 words.sort();
@@ -350,12 +353,11 @@ mod tests {
         let proj_ortho_results = search(&search_index, "Les projections orthogonales sont les projections symétriques");
         assert!(!proj_ortho_results.is_empty());
         assert_eq!(proj_ortho_results[0].document_digest, "24_Espaces_prehilbertiens_suite.pdf");
-        assert_eq!(proj_ortho_results[0].number, 9);
-
+        assert_eq!(proj_ortho_results[0].number, 10);
 
         let sp_theorem_results = search(&search_index, "Caractérisation des suites totales par des projecteurs orthogonaux.");
         assert!(!sp_theorem_results.is_empty());
         assert_eq!(sp_theorem_results[0].document_digest, "24_Espaces_prehilbertiens_suite.pdf");
-        assert_eq!(sp_theorem_results[0].number, 10);
+        assert_eq!(sp_theorem_results[0].number, 2);
     }
 }
