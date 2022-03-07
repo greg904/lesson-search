@@ -25,7 +25,7 @@ pub fn normalize_and_extract_words(s: &str) -> Vec<String> {
                     ![
                         "le", "la", "de", "un", "et", "en", "que", "dan", "pour", "ce", "qui",
                         "ne", "se", "sur", "pas", "par", "on", "mais", "ou", "comm", "il", "est",
-                        "du", "lorsqu", "express", "une",
+                        "du", "lorsqu", "une",
                     ]
                     .contains(p)
                 })
