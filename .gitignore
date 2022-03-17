@@ -3,7 +3,6 @@
 /db-test
 /pdfjs
 /lessons/*.pdf
-/tools/gcv-ocr/node_modules
-/tools/gcv-ocr/*.json
-!/tools/gcv-ocr/*.png.json
+/gcv-ocr/node_modules
+/gcv-ocr/*.json
 /scans

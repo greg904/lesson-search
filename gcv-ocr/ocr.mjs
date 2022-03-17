@@ -3,8 +3,8 @@ import * as fs from 'fs/promises'
 import { constants as fsConstants } from 'fs'
 
 async function main () {
-	const input = '../../scans/'
-	const files = (await Promise.all((await fs.readdir(input))
+	const inputDir = '../scans/'
+	const files = (await Promise.all((await fs.readdir(inputDir))
 		.filter(f => f.endsWith('.png'))
 		.map(async f => {
 			try {
@@ -22,7 +22,7 @@ async function main () {
 		numeric: true,
 		sensitivity: 'base',
 	}))
-	const bytes = await Promise.all(files.map(f => fs.readFile(input + f)))
+	const bytes = await Promise.all(files.map(f => fs.readFile(inputDir + f)))
 	const client = new vision.ImageAnnotatorClient()
 	const chunkSize = 2
 	for (let i = 0; i < files.length; i += chunkSize) {
@@ -45,6 +45,7 @@ async function main () {
 			let name = files[i + j]
 			await fs.writeFile(name + '.json', JSON.stringify(result.responses[j]))
 		}
+		console.log('Progess: ' + Math.min((i + chunkSize) / files.length * 100, 100) + '%')
 	}
 }
 

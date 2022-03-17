@@ -11,8 +11,8 @@ async function main() {
 	const ocrFiles = (await fs.readdir('.'))
 		.filter(f => f.endsWith('.png.json'))
 		.filter(f => {
-			const n = parseInt(f.substring('Image ('.length))
-			return n >= 1 && n <= 8
+			const n = parseInt(f.substring('page-'.length))
+			return n >= 41
 		})
 	ocrFiles.sort((a, b) => a.localeCompare(b, undefined, {
 		numeric: true,
@@ -24,7 +24,7 @@ async function main() {
 	})
 	for (const ocrFile of ocrFiles) {
 		doc.addPage({ margin: 0 })
-		const tmp = '../../scans/' + ocrFile.substring(0, ocrFile.length - '.png.json'.length)
+		const tmp = '../scans/' + ocrFile.substring(0, ocrFile.length - '.png.json'.length)
 		const imageSize = await sizeOf(tmp + '.png')
 		doc.image(tmp + '.jpg', 0, 0, { width: doc.page.width, height: doc.page.height })
 		const scaleX = doc.page.width / imageSize.width

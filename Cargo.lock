@@ -822,6 +822,8 @@ dependencies = [
  "mupdf",
  "rayon",
  "search-index",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
