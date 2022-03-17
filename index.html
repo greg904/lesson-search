@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width">
 <meta name="color-scheme" content="light dark">
 <title>Recherche de cours</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@4.0/dist/fancybox.css" />
 <style>
 html, body, h1 {
 	margin: 0;
@@ -81,6 +82,11 @@ body {
 	color: white;
 }
 
+/* Make the frame larger. */
+.fancybox__slide {
+	padding: 15px;
+}
+
 #top {
 	display: none;
 
@@ -100,6 +106,8 @@ body {
 
 	cursor: pointer;
 }
+
+
 
 @media (min-width: 480px) {
 	body {
@@ -128,7 +136,6 @@ body {
 	}
 }
 </style>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@4.0/dist/fancybox.css" />
 </head>
 <body>
 <div id="header">
