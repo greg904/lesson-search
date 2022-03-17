@@ -7,6 +7,7 @@ edition = "2021"
 base64 = "0.13.0"
 rayon = "1.5"
 search-index = { path = "../search-index" }
+serde_json = "1.0"
 
 [dependencies.libavif]
 # TODO: Switch to crates.io when the fix to build libaom-sys on Linux lands.
@@ -26,3 +27,7 @@ default-features = false
 [dependencies.mupdf]
 version = "0.3.0"
 default-features = false
+
+[dependencies.serde]
+version = "1"
+features = ["derive"]

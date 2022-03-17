@@ -1,16 +1,19 @@
 use std::{
     env,
     fs::{self, File, OpenOptions},
-    io,
+    io::{self, BufReader},
     path::{Path, PathBuf},
-    sync::{Mutex, RwLock},
+    sync::{Mutex, RwLock}, ffi::{OsStr, OsString},
 };
 
 use mupdf::{pdf::PdfDocument, Colorspace, Matrix, Outline, TextPageOptions};
 use rayon::prelude::*;
 use search_index::index::{Match, Page, SearchIndex, SearchResult};
 
+use crate::config::LessonConfig;
+
 mod page_render_cache;
+mod config;
 
 fn find_first_useful_outline(outlines: &[Outline]) -> Option<&Outline> {
     let o = outlines
@@ -28,6 +31,15 @@ fn build_search_index_from_document(
     cache: &RwLock<page_render_cache::DocumentMap>,
 ) -> SearchIndex {
     eprintln!("Processing {}...", document_path.display());
+
+    let mut config_ext = document_path.extension().map(|s| s.to_owned()).unwrap_or_else(|| OsString::new());
+    config_ext.push(".json");
+    let config_path = document_path.with_extension(config_ext);
+    let config: LessonConfig = match File::open(&config_path) {
+        Ok(f) => serde_json::from_reader(BufReader::new(f)).unwrap(),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Default::default(),
+        Err(e) => panic!("failed to open lesson config at {}: {}", config_path.display(), e),
+    };
 
     let document_name = document_path.file_name().unwrap().to_str().unwrap();
 
@@ -52,7 +64,8 @@ fn build_search_index_from_document(
     let mut search_index = SearchIndex::new();
     search_index.documents.push(document_name.to_owned());
 
-    const SCALE: f32 = 1.8;
+    const DEFAULT_SCALE: f32 = 1.8;
+    let scale = DEFAULT_SCALE * config.scale;
 
     for (page_nr, page) in doc.pages().unwrap().enumerate() {
         let page = page.unwrap();
@@ -108,10 +121,10 @@ fn build_search_index_from_document(
                 let result_index = search_index.results.len();
                 search_index.results.push(SearchResult {
                     page_index,
-                    x: (bounds.x0 * SCALE) as i16,
-                    y: (bounds.y0 * SCALE) as i16,
-                    width: ((bounds.x1 - bounds.x0) * SCALE) as u16,
-                    height: ((bounds.y1 - bounds.y0) * SCALE) as u16,
+                    x: (bounds.x0 * scale) as i16,
+                    y: (bounds.y0 * scale) as i16,
+                    width: ((bounds.x1 - bounds.x0) * scale) as u16,
+                    height: ((bounds.y1 - bounds.y0) * scale) as u16,
                 });
 
                 for w in words.iter() {
@@ -163,7 +176,7 @@ fn build_search_index_from_document(
                 .load_page(p.page_nr as i32)
                 .unwrap()
                 .to_pixmap(
-                    &Matrix::new_scale(SCALE, SCALE),
+                    &Matrix::new_scale(scale, scale),
                     &Colorspace::device_rgb(),
                     0.,
                     false,
