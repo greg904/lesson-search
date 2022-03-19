@@ -97,9 +97,10 @@ fn build_search_index_from_document(
 
                 let mut score = 1.;
                 // Heuristic for font size.
-                let font_size = ((bounds.x1 - bounds.x0) * (bounds.y1 - bounds.y0)
+                let mut font_size = ((bounds.x1 - bounds.x0) * (bounds.y1 - bounds.y0)
                     / (line.len() as f32))
                     .sqrt();
+                font_size *= config.scale;
                 const AVG_FONT_SIZE: f32 = 10.;
                 const FONT_SIZE_STD: f32 = 2.;
                 let mut importance = 1. / (1. + (-(font_size - AVG_FONT_SIZE) / FONT_SIZE_STD).clamp(-10., 10.).exp());
