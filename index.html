@@ -64,6 +64,23 @@ body {
 	overflow-y: hidden;
 }
 
+.page-wrapper {
+	position: relative;
+}
+
+.page-wrapper:after {
+	content: '';
+
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+
+	pointer-events: none;
+	box-shadow: 0 0 10px rgba(0, 0, 0, 0.2) inset;
+}
+
 .highlight {
 	position: absolute;
 	background: yellow;
@@ -107,8 +124,6 @@ body {
 	cursor: pointer;
 }
 
-
-
 @media (min-width: 480px) {
 	body {
 		text-align: left;
@@ -133,6 +148,10 @@ body {
 
 	#query:focus {
 		border-color: #008cfd;
+	}
+
+	.page-wrapper:after {
+		box-shadow: 0 0 10px rgba(0, 0, 0, 0.5) inset;
 	}
 }
 </style>
@@ -175,11 +194,15 @@ async function fetchAndUpdate (query) {
 		}
 		cropStart = Math.max(cropStart, 0)
 
+		const pageWrapper = document.createElement('div')
+		pageWrapper.classList.add('page-wrapper')
+
 		const pageDiv = document.createElement('div')
 		pageDiv.classList.add('page')
 		if (cropEnd !== Infinity) {
 			pageDiv.style.maxHeight = (cropEnd - cropStart) + 'px'
 		}
+		pageWrapper.appendChild(pageDiv)
 
 		const image = document.createElement('img')
 		image.src = renderedPageEndpoint + page.renderedImageId + '.avif'
@@ -205,12 +228,12 @@ async function fetchAndUpdate (query) {
 		const openLink = document.createElement('a')
 		openLink.classList.add('open-link')
 		openLink.href = 'pdfjs/web/viewer.html?file=' + documentEndpoint + page.documentName + '#page=' + (page.pageNr + 1)
-		openLink.textContent = 'Ouvrir PDF'
+		openLink.textContent = 'PDF'
 		openLink.setAttribute('data-fancybox', '')
 		openLink.setAttribute('data-type', 'pdf')
-		pageDiv.appendChild(openLink)
+		pageWrapper.appendChild(openLink)
 
-		pagesDiv.appendChild(pageDiv)
+		pagesDiv.appendChild(pageWrapper)
 	}
 }
 
