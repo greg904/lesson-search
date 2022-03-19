@@ -10,9 +10,12 @@ projeté projecteur projection
 schwarz schwartz
 "cauchy schwarz" cs
 "produit scalaire" ps
-mat matrice matriciel
+mat matrice matriciel mn
 "variable aléatoire" va
 "variable aléatoire discrète" vad
 exponentielle exp
 continu continuité
 bienaymé bienaimé
+linéaire linéarité
+équation équa
+différentielle diff
