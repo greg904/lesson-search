@@ -13,3 +13,6 @@ schwarz schwartz
 mat matrice matriciel
 "variable aléatoire" va
 "variable aléatoire discrète" vad
+exponentielle exp
+continu continuité
+bienaymé bienaimé

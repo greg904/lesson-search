@@ -6,7 +6,9 @@ pub fn normalize_and_extract_words(s: &str) -> Vec<String> {
     let stemmer = Stemmer::create(Algorithm::French);
     let ascii = deunicode::deunicode(s);
     let ascii_without_symbols: String = ascii.chars()
-        .map(|c| if c == '-' { ' ' } else { c })
+        // Don't replace dots by space because we want to remove dots later, so
+        // that acronyms can work.
+        .map(|c| if c.is_ascii_punctuation() && c != '.' { ' ' } else { c })
         .filter(|c| c.is_ascii_alphanumeric() || c.is_ascii_whitespace())
         .collect();
     let filtered_words = ascii_without_symbols

@@ -52,7 +52,8 @@ fn main() {
         // Stem synonyms.
         let synonyms: Vec<_> = synonyms.into_iter()
             .map(|s| {
-                s.split(|c: char| c.is_whitespace())
+                deunicode::deunicode(&s)
+                    .split(|c: char| c.is_whitespace())
                     .map(|w| {
                         let w = w.to_lowercase();
                         if w == "cs" {
