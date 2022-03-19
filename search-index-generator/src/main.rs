@@ -332,6 +332,8 @@ mod tests {
         build_search_index(Path::new("../lessons"), Path::new("../db-test")).unwrap();
         let search_index = SearchIndex::deserialize(&mut File::open("../db-test/search-index.bin").unwrap()).unwrap();
 
+        // Excerpts from colle #19
+
         let cs_results = search(&search_index, "cs");
         assert!(!cs_results.is_empty());
         assert_eq!(cs_results[0].document_digest, "23_rev_Espaces_prehilbertiens.pdf");
@@ -371,5 +373,32 @@ mod tests {
         assert!(!sp_theorem_results.is_empty());
         assert_eq!(sp_theorem_results[0].document_digest, "24_Espaces_prehilbertiens_suite.pdf");
         assert_eq!(sp_theorem_results[0].number, 2);
+
+        // Excerpts from colle #21.
+
+        let poisson_results = search(&search_index, "Approximation d’une loi binomiale par une loi de Poisson.");
+        assert!(!poisson_results.is_empty());
+        assert_eq!(poisson_results[0].document_digest, "20_Variables_Aleatoires.pdf");
+        assert_eq!(poisson_results[0].number, 19);
+
+        let bt_results = search(&search_index, "Inégalités de Bienaymé-Tchebychev.");
+        assert!(!bt_results.is_empty());
+        assert_eq!(bt_results[0].document_digest, "20_Variables_Aleatoires.pdf");
+        assert_eq!(bt_results[0].number, 36);
+
+        let loi_grands_nombres_results = search(&search_index, "Loi faible des grands nombres.");
+        assert!(!loi_grands_nombres_results.is_empty());
+        assert_eq!(loi_grands_nombres_results[0].document_digest, "20_Variables_Aleatoires.pdf");
+        assert_eq!(loi_grands_nombres_results[0].number, 37);
+
+        let linear_derivative_results = search(&search_index, "Dérivation linéaire");
+        assert!(!linear_derivative_results.is_empty());
+        assert_eq!(linear_derivative_results[0].document_digest, "26_fonctions_vectorielles_resume.pdf");
+        assert_eq!(linear_derivative_results[0].number, 0);
+
+        let exp_matrix_results = search(&search_index, "Continuité de exp matrice");
+        assert!(!exp_matrix_results.is_empty());
+        assert_eq!(exp_matrix_results[0].document_digest, "26_fonctions_vectorielles_resume.pdf");
+        assert_eq!(exp_matrix_results[0].number, 7);
     }
 }
