@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     io::{self, Read, Write},
 };
 
@@ -124,7 +124,7 @@ pub struct SearchIndex {
     pub documents: Vec<String>,
     pub pages: Vec<Page>,
     pub results: Vec<SearchResult>,
-    pub words: HashMap<String, Vec<Match>>,
+    pub words: BTreeMap<String, Vec<Match>>,
 }
 
 impl SearchIndex {
@@ -148,7 +148,7 @@ impl SearchIndex {
         }
 
         let word_count = deserialize_u32(r)?;
-        let mut words = HashMap::with_capacity(word_count as usize);
+        let mut words = BTreeMap::new();
         for _ in 0..word_count {
             let word = deserialize_string(r)?;
 

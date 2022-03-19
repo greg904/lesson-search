@@ -32,8 +32,13 @@ pub fn search(search_index: &SearchIndex, query: &str) -> Vec<MatchPage> {
     }
 
     let mut pages: BTreeMap<u32, (Vec<u32>, HashMap<String, f32>)> = BTreeMap::new();
-    for w in words.iter() {
-        if let Some(matches) = search_index.words.get(w) {
+    for w in words.into_iter() {
+        // Prefix key search.
+        for (word, matches) in search_index.words.range(w.clone()..) {
+            if !word.starts_with(&w) {
+                break;
+            }
+            let score_multiplier = (w.len() as f32) / (word.len() as f32);
             for m in matches {
                 let result = &search_index.results[m.result_index as usize];
                 let (results, max_scores) = pages.entry(result.page_index).or_default();
@@ -45,7 +50,7 @@ pub fn search(search_index: &SearchIndex, query: &str) -> Vec<MatchPage> {
                     results.push(m.result_index);
                 }
                 let max_score = max_scores.entry(w.to_owned()).or_default();
-                *max_score = max_score.max(m.score);
+                *max_score = max_score.max(m.score * score_multiplier);
             }
         }
     }
