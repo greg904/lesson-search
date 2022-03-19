@@ -22,13 +22,13 @@ pub fn normalize_and_extract_words(s: &str) -> Vec<String> {
                 stemmer.stem(&w).to_string()
             }
         })
-        .filter(|w| !w.is_empty())
+        .filter(|w| w.len() >= 2)
         // Ignore common words
         .filter(|w| {
             ![
                 "le", "la", "de", "un", "et", "en", "que", "dan", "pour", "ce", "qui",
-                "ne", "se", "sur", "pas", "par", "on", "mais", "ou", "comm", "il", "est",
-                "du", "lorsqu", "une",
+                "ne", "se", "sur", "pas", "par", "on", "mais", "ou", "comm", "il",
+                "du", "lorsqu", "une", "est", "sont",
             ]
             .contains(&w.as_str())
         })
@@ -74,6 +74,11 @@ mod tests {
     #[test]
     fn acronyms() {
         assert_eq!(normalize_and_extract_words("t.e.s.t."), vec!["test"]);
+    }
+
+    #[test]
+    fn symbols() {
+        assert_eq!(normalize_and_extract_words("approximation d'une loi"), vec!["approxim", "loi"]);
     }
 
     #[test]
