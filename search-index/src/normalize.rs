@@ -6,10 +6,11 @@ pub fn normalize_and_extract_words(s: &str) -> Vec<String> {
     let stemmer = Stemmer::create(Algorithm::French);
     let ascii = deunicode::deunicode(s);
     let ascii_without_symbols: String = ascii.chars()
+        .map(|c| if c == '-' { ' ' } else { c })
         .filter(|c| c.is_ascii_alphanumeric() || c.is_ascii_whitespace())
         .collect();
     let filtered_words = ascii_without_symbols
-        .split(|c: char| c.is_ascii_whitespace())
+        .split(|c: char| !c.is_ascii_alphanumeric())
         .map(|w| {
             let w = w.to_lowercase();
             // The stemmer converts "cs" (Cauchy-Schwarz) into "c" which we do not want.
@@ -71,5 +72,10 @@ mod tests {
     #[test]
     fn acronyms() {
         assert_eq!(normalize_and_extract_words("t.e.s.t."), vec!["test"]);
+    }
+
+    #[test]
+    fn synonyms() {
+        assert_eq!(normalize_and_extract_words("cs"), vec!["cauchy", "schwarz"]);
     }
 }
