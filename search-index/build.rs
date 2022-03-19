@@ -5,6 +5,9 @@ use std::io::BufRead;
 use std::io::BufReader;
 use std::path::Path;
 
+use rust_stemmers::Algorithm;
+use rust_stemmers::Stemmer;
+
 fn parse_words(line: &str) -> Vec<String> {
     let mut words = Vec::new();
     let mut current = Vec::new();
@@ -41,9 +44,27 @@ fn main() {
 
     let mut code = "pub const SYNONYMS: &[(&str, &[&str])] = &[\n".to_owned();
 
+    let stemmer = Stemmer::create(Algorithm::French);
+
     let reader = BufReader::new(File::open("src/synonyms.txt").unwrap());
     for line in reader.lines() {
         let synonyms = parse_words(&line.unwrap());
+        // Stem synonyms.
+        let synonyms: Vec<_> = synonyms.into_iter()
+            .map(|s| {
+                s.split(|c: char| c.is_whitespace())
+                    .map(|w| {
+                        let w = w.to_lowercase();
+                        if w == "cs" {
+                            w
+                        } else {
+                            stemmer.stem(&w.to_lowercase()).to_string()
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            })
+            .collect();
         if synonyms.len() < 2 {
             continue;
         }

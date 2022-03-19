@@ -347,7 +347,7 @@ mod tests {
         assert_eq!(proj_results[0].document_digest, "23_rev_Espaces_prehilbertiens.pdf");
         assert_eq!(proj_results[0].number, 20);
 
-        let dist_results = search(&search_index, "Distance à un sous­espace de dimension finie.");
+        let dist_results = search(&search_index, "Distance à un sous-espace de dimension finie.");
         assert!(!dist_results.is_empty());
         assert_eq!(dist_results[0].document_digest, "23_rev_Espaces_prehilbertiens.pdf");
         assert_eq!(dist_results[0].number, 23);

@@ -1,11 +1,15 @@
-sev "sous espac vectoriel" "sous espac"
-bon "bas orthonormal"
-tmc "theorem moment cinet"
-faf "formul accroissement fin"
-taf "theorem accroissement fin"
-iaf "inegalit accroissement fin"
-projet projecteur project
-df "dimens fin"
-cs "cauchy schwarz"
-ps "produit scalaire"
-mat matric matriciel
+"sous espace" "sous espace vectoriel" sev
+"base orthonormale" bon
+"théorème moment cinétique" tmc
+"formule accroissements finis" faf
+"théorème accroissements finis" taf
+"inégalité accroissements finis" iaf
+"inégalité taylor lagrange" itl
+projeté projecteur projection
+"dimension finie" df
+schwarz schwartz
+"cauchy schwarz" cs
+"produit scalaire" ps
+mat matrice matriciel
+"variable aléatoire" va
+"variable aléatoire discrète" vad
