@@ -76,6 +76,18 @@ fn build_search_index_from_document(
                 continue;
             }
         }
+
+        // This is needed for the color ignoring.
+        // TODO: fix the `alpha` parameter not being a boolean
+        let pixmap = page
+            .to_pixmap(
+                &Matrix::IDENTITY,
+                &Colorspace::device_rgb(),
+                0.,
+                false,
+            )
+            .unwrap();
+
         let text_page = page.to_text_page(TextPageOptions::empty()).unwrap();
         let page_index = search_index.pages.len() as u32;
         let mut has_result = false;
@@ -89,6 +101,23 @@ fn build_search_index_from_document(
                 }
 
                 let line: String = l.chars().flat_map(|c| c.char()).collect();
+
+                let check_color = |x, y| {
+                    let index = y as usize * pixmap.width() as usize * 3 + x as usize * 3;
+                    if index + 3 >= pixmap.samples().len() {
+                        return false;
+                    }
+                    config.ignore_colors.iter()
+                        .any(|c| pixmap.samples()[index] == c[0] &&
+                            pixmap.samples()[index + 1] == c[1] &&
+                            pixmap.samples()[index + 2] == c[2])
+                };
+                if check_color(bounds.x0, bounds.y0) ||
+                    check_color(bounds.x0, bounds.y1) ||
+                    check_color(bounds.x1, bounds.y0) ||
+                    check_color(bounds.x1, bounds.y1) {
+                    continue;
+                }
 
                 let mut words = search_index::normalize::normalize_and_extract_words(&line);
                 if words.is_empty() {
