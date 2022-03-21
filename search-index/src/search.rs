@@ -19,7 +19,8 @@ pub type PageNumber = u16;
 pub struct MatchPage {
     pub document_digest: Digest,
     pub number: PageNumber,
-    pub image_digest: Digest,
+    pub rendered_avif: Digest,
+    pub rendered_jpeg: Digest,
     pub width: u16,
     pub height: u16,
     pub highlights: Vec<Highlight>,
@@ -137,7 +138,8 @@ pub fn search(search_index: &SearchIndex, query: &str) -> Vec<MatchPage> {
             MatchPage {
                 document_digest,
                 number: page.page_nr,
-                image_digest: page.rendered_image_id.clone(),
+                rendered_avif: page.rendered_avif.clone(),
+                rendered_jpeg: page.rendered_jpeg.clone(),
                 width: page.width,
                 height: page.height,
                 highlights,

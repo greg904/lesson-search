@@ -24,7 +24,8 @@ struct Rect {
 struct Page {
     document_name: String,
     page_nr: u16,
-    rendered_image_id: String,
+    rendered_avif: String,
+    rendered_jpeg: String,
     width: u16,
     height: u16,
     rects: Vec<Rect>,
@@ -49,7 +50,8 @@ fn main() {
                 .map(|p| Page {
                     document_name: p.document_digest,
                     page_nr: p.number,
-                    rendered_image_id: p.image_digest,
+                    rendered_avif: p.rendered_avif,
+                    rendered_jpeg: p.rendered_jpeg,
                     width: p.width,
                     height: p.height,
                     rects: p.highlights.into_iter().map(|h| Rect {

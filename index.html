@@ -175,12 +175,36 @@ const queryInput = document.getElementById('query')
 const pagesDiv = document.getElementById('pages')
 let isLooping = false
 
+async function supportsAvif() {
+	if (!window.createImageBitmap) return false
+	const avifData = 'data:image/avif;base64,AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZk1BMUIAAADybWV0YQAAAAAAAAAoaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAGxpYmF2aWYAAAAADnBpdG0AAAAAAAEAAAAeaWxvYwAAAABEAAABAAEAAAABAAABGgAAAB0AAAAoaWluZgAAAAAAAQAAABppbmZlAgAAAAABAABhdjAxQ29sb3IAAAAAamlwcnAAAABLaXBjbwAAABRpc3BlAAAAAAAAAAIAAAACAAAAEHBpeGkAAAAAAwgICAAAAAxhdjFDgQ0MAAAAABNjb2xybmNseAACAAIAAYAAAAAXaXBtYQAAAAAAAAABAAEEAQKDBAAAACVtZGF0EgAKCBgANogQEAwgMg8f8D///8WfhwB8+ErK42A='
+	const res = await fetch(avifData)
+	const blob = await res.blob()
+	try {
+		await createImageBitmap(blob)
+		return true
+	} catch (err) {
+		console.error('No AVIF support: ' + err)
+		return false
+	}
+}
+
+let supportsAvifPromise
+function supportsAvifCached() {
+	if (supportsAvifPromise === undefined) {
+		supportsAvifPromise = supportsAvif()
+	}
+	return supportsAvifPromise
+}
+
 async function fetchAndUpdate (query) {
 	const res = await fetch(queryEndpoint + encodeURIComponent(query))
 	const pages = await res.json()
 
 	// Remove all previous results.
 	pagesDiv.innerHTML = ''
+
+	const avif = await supportsAvifCached()
 
 	// Create new elements.
 	for (let page of pages) {
@@ -205,7 +229,7 @@ async function fetchAndUpdate (query) {
 		pageWrapper.appendChild(pageDiv)
 
 		const image = document.createElement('img')
-		image.src = renderedPageEndpoint + page.renderedImageId + '.avif'
+		image.src = renderedPageEndpoint + (avif ? (page.renderedAvif + '.avif') : (page.renderedJpeg + '.jpg'))
 		image.setAttribute('draggable', 'false')
 		image.setAttribute('loading', 'lazy')
 		image.width = page.width

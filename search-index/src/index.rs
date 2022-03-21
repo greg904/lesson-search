@@ -51,7 +51,8 @@ fn deserialize_vec_string<R: Read>(r: &mut R) -> io::Result<Vec<String>> {
 pub struct Page {
     pub document_index: u16,
     pub page_nr: u16,
-    pub rendered_image_id: String,
+    pub rendered_avif: String,
+    pub rendered_jpeg: String,
     pub width: u16,
     pub height: u16,
 }
@@ -60,14 +61,16 @@ impl Page {
     fn deserialize<R: Read>(r: &mut R) -> io::Result<Self> {
         let document_index = deserialize_u16(r)?;
         let page_nr = deserialize_u16(r)?;
-        let rendered_image_id = deserialize_string(r)?;
+        let rendered_avif = deserialize_string(r)?;
+        let rendered_jpeg = deserialize_string(r)?;
         let width = deserialize_u16(r)?;
         let height = deserialize_u16(r)?;
 
         Ok(Self {
             document_index,
             page_nr,
-            rendered_image_id,
+            rendered_avif,
+            rendered_jpeg,
             width,
             height,
         })
@@ -180,8 +183,10 @@ impl SearchIndex {
         for page in self.pages.iter() {
             w.write_all(&page.document_index.to_le_bytes())?;
             w.write_all(&page.page_nr.to_le_bytes())?;
-            w.write_all(&(page.rendered_image_id.len() as u32).to_le_bytes())?;
-            w.write_all(page.rendered_image_id.as_bytes())?;
+            w.write_all(&(page.rendered_avif.len() as u32).to_le_bytes())?;
+            w.write_all(page.rendered_avif.as_bytes())?;
+            w.write_all(&(page.rendered_jpeg.len() as u32).to_le_bytes())?;
+            w.write_all(page.rendered_jpeg.as_bytes())?;
             w.write_all(&page.width.to_le_bytes())?;
             w.write_all(&page.height.to_le_bytes())?;
         }
