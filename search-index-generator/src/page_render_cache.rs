@@ -11,7 +11,8 @@ pub(crate) type Digest = String;
 /// An image.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Image {
-    pub digest: Digest,
+    pub avif_digest: Digest,
+    pub jpeg_digest: Digest,
     pub width: u16,
     pub height: u16,
 }
@@ -65,8 +66,10 @@ impl DocumentMap {
             w.write_all(&(pages.0.len() as u16).to_le_bytes())?;
             for (page_nr, image) in pages.0.iter() {
                 w.write_all(&page_nr.to_le_bytes())?;
-                w.write_all(&(image.digest.len() as u32).to_le_bytes())?;
-                w.write_all(image.digest.as_bytes())?;
+                w.write_all(&(image.avif_digest.len() as u32).to_le_bytes())?;
+                w.write_all(image.avif_digest.as_bytes())?;
+                w.write_all(&(image.jpeg_digest.len() as u32).to_le_bytes())?;
+                w.write_all(image.jpeg_digest.as_bytes())?;
                 w.write_all(&image.width.to_le_bytes())?;
                 w.write_all(&image.height.to_le_bytes())?;
             }
@@ -83,13 +86,15 @@ impl DocumentMap {
             let mut pages = PageImageMap(HashMap::with_capacity(page_count as usize));
             for _ in 0..page_count {
                 let page_nr = deserialize_u16(r)?;
-                let image_digest = deserialize_string(r)?;
+                let avif_digest = deserialize_string(r)?;
+                let jpeg_digest = deserialize_string(r)?;
                 let width = deserialize_u16(r)?;
                 let height = deserialize_u16(r)?;
                 pages.0.insert(
                     page_nr,
                     Image {
-                        digest: image_digest,
+                        avif_digest,
+                        jpeg_digest,
                         width,
                         height,
                     },

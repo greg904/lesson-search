@@ -189,8 +189,11 @@ fn build_search_index_from_document(
             page_nr: page_nr as u16,
             width: cached_page.as_ref().map(|p| p.width).unwrap_or(0),
             height: cached_page.as_ref().map(|p| p.height).unwrap_or(0),
-            rendered_image_id: cached_page
-                .map(|p| p.digest)
+            rendered_avif: cached_page.as_ref()
+                .map(|p| p.avif_digest.clone())
+                .unwrap_or_else(|| String::new()),
+            rendered_jpeg: cached_page.as_ref()
+                .map(|p| p.jpeg_digest.clone())
                 .unwrap_or_else(|| String::new()),
         });
     }
@@ -199,7 +202,7 @@ fn build_search_index_from_document(
     search_index
         .pages
         .iter_mut()
-        .filter(|p| p.rendered_image_id.is_empty())
+        .filter(|p| p.rendered_avif.is_empty() || p.rendered_jpeg.is_empty())
         .map(|p| {
             // TODO: fix the `alpha` parameter not being a boolean
             let pixmap = doc
@@ -227,19 +230,44 @@ fn build_search_index_from_document(
                 p.page_nr + 1,
                 document_path.display()
             );
-            let pixels = libavif::RgbPixels::new(width, height, &samples).unwrap();
-            let image = pixels.to_image(libavif::YuvFormat::Yuv444);
-            let mut encoder = libavif::Encoder::new();
-            encoder.set_quantizer(40);
-            encoder.set_speed(0);
-            let encoded = &*encoder.encode(&image).unwrap();
-            let digest = blake3::hash(&encoded);
-            let digest = base64::encode_config(digest.as_bytes(), base64::URL_SAFE_NO_PAD);
-            fs::write(
-                rendered_pages_path.join(format!("{}.avif", digest)),
-                &*encoded,
-            )
-            .unwrap();
+
+            if p.rendered_avif.is_empty() {
+                let pixels = libavif::RgbPixels::new(width, height, &samples).unwrap();
+                let image = pixels.to_image(libavif::YuvFormat::Yuv444);
+                let mut encoder = libavif::Encoder::new();
+                encoder.set_quantizer(40);
+                encoder.set_speed(0);
+                let encoded = &*encoder.encode(&image).unwrap();
+                let digest = blake3::hash(&encoded);
+                let digest = base64::encode_config(digest.as_bytes(), base64::URL_SAFE_NO_PAD);
+                fs::write(
+                    rendered_pages_path.join(format!("{}.avif", digest)),
+                    &*encoded,
+                )
+                .unwrap();
+                p.rendered_avif = digest;
+            }
+
+            if p.rendered_jpeg.is_empty() {
+                let mut compressor = turbojpeg::Compressor::new().unwrap();
+                compressor.set_quality(90);
+                let image = turbojpeg::Image {
+                    pixels: &*samples,
+                    width: width.try_into().unwrap(),
+                    pitch: (width * 3).try_into().unwrap(),
+                    height: height.try_into().unwrap(),
+                    format: turbojpeg::PixelFormat::RGB,
+                };
+                let encoded = compressor.compress_to_vec(image).unwrap();
+                let digest = blake3::hash(&encoded);
+                let digest = base64::encode_config(digest.as_bytes(), base64::URL_SAFE_NO_PAD);
+                fs::write(
+                    rendered_pages_path.join(format!("{}.jpg", digest)),
+                    &*encoded,
+                )
+                .unwrap();
+                p.rendered_jpeg = digest;
+            }
 
             {
                 let mut c = cache.write().unwrap();
@@ -247,14 +275,14 @@ fn build_search_index_from_document(
                 d.0.insert(
                     p.page_nr,
                     page_render_cache::Image {
-                        digest: digest.clone(),
+                        avif_digest: p.rendered_avif.clone(),
+                        jpeg_digest: p.rendered_jpeg.clone(),
                         width: width as u16,
                         height: height as u16,
                     },
                 );
             }
 
-            p.rendered_image_id = digest;
             p.width = width as u16;
             p.height = height as u16;
         });
