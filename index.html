@@ -169,7 +169,17 @@ const isDevelopment = location.origin === 'http://localhost:8000'
 const queryEndpoint = isDevelopment ? 'http://localhost:3000/' : 'https://mp1.mpsi1.fr/cours/api/'
 const renderedPageEndpoint = isDevelopment ? '/db/rendered-pages/' : 'https://mp1.mpsi1.fr/cours/pages/'
 const documentEndpoint = isDevelopment ? '/lessons/' : 'https://mp1.mpsi1.fr/cours/lessons/'
-const pdfJsRoot = isDevelopment ? '/pdfjs/' : 'https://mp1.mpsi1.fr/cours/pdfjs/'
+
+let pdfJsLegacy = ''
+try {
+	const params = new URLSearchParams(location.search)
+	if (params.has('legacy') && params.get('legacy') !== '0') {
+		pdfJsLegacy = '-legacy'
+	}
+} catch (e) {
+	console.error('Failed to detect legacy browser: ' + e)
+}
+const pdfJsRoot = isDevelopment ? ('/pdfjs-2.13.216' + pdfJsLegacy + '-dist/') : 'https://mp1.mpsi1.fr/cours/pdfjs-2.13.216-dist/'
 
 const queryInput = document.getElementById('query')
 const pagesDiv = document.getElementById('pages')
@@ -251,7 +261,7 @@ async function fetchAndUpdate (query) {
 
 		const openLink = document.createElement('a')
 		openLink.classList.add('open-link')
-		openLink.href = 'pdfjs/web/viewer.html?file=' + documentEndpoint + page.documentName + '#page=' + (page.pageNr + 1)
+		openLink.href = pdfJsRoot + 'web/viewer.html?file=' + documentEndpoint + page.documentName + '#page=' + (page.pageNr + 1)
 		openLink.textContent = 'PDF'
 		openLink.setAttribute('data-fancybox', '')
 		openLink.setAttribute('data-type', 'pdf')

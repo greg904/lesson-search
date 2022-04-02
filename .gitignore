@@ -1,7 +1,7 @@
 /target
 /db
 /db-test
-/pdfjs
+/pdfjs*
 /lessons/*.pdf
 /gcv-ocr/node_modules
 /gcv-ocr/*.json
